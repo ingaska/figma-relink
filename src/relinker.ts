@@ -113,16 +113,23 @@ function findLocalComponent(
 // Name helpers
 // ---------------------------------------------------------------------------
 
-/** Strip Figma layer-type icon characters that appear in remote component names */
+/**
+ * Strip Figma layer-type icon characters from component names.
+ * Uses a broad Unicode range (symbol blocks + private-use area) so it works
+ * regardless of the exact codepoints Figma uses internally for ❖/◆/etc.
+ */
 function cleanName(name: string): string {
-  return name.replace(/[❖◆◇▾▸]/g, '').replace(/\s{2,}/g, ' ').trim();
+  return name
+    .replace(/[\u2000-\u27FF\uE000-\uF8FF]/g, '') // symbol blocks & PUA
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 /**
  * Remote library components sometimes return `mainComponent.name` as a full
  * hierarchical path like "component/❖ Footer/◆ mobile/paddingTop??".
- * Parse out the real set name (❖-prefixed segment) and variant name (◆-prefixed
- * segment or last clean segment) so matching against local components works.
+ * Parse by position: skip the "component" prefix at index 0, take index 1 as
+ * set name and index 2 as variant name (after cleaning icon characters).
  */
 function parseRemoteName(
   rawName: string,
@@ -131,20 +138,14 @@ function parseRemoteName(
   if (!rawName.includes('/')) {
     return { variantName: cleanName(rawName), setName: null };
   }
-  const parts = rawName.split('/');
-  let setName: string | null = null;
-  let variantName: string | null = null;
-  for (const part of parts) {
-    if (part.includes('❖') && !setName) setName = cleanName(part);
-    else if (part.includes('◆') && !variantName) variantName = cleanName(part);
-  }
-  // Fall back: last segment that isn't a plain "component" prefix
-  if (!variantName) {
-    const last = cleanName(parts[parts.length - 1]);
-    variantName = last || cleanName(rawName);
-  }
-  // If still no set name, use the instance's own name (Figma keeps the set name there)
-  if (!setName && instName && instName !== rawName) setName = cleanName(instName);
+  const parts = rawName.split('/').map(cleanName).filter(Boolean);
+  // Skip generic "component" prefix if present
+  const start = parts[0]?.toLowerCase() === 'component' ? 1 : 0;
+  const setFromPath = parts[start] ?? null;
+  const variantFromPath = parts[start + 1] ?? null;
+  // Prefer the explicit path segments; fall back to inst name for set
+  const variantName = variantFromPath ?? setFromPath ?? cleanName(rawName);
+  const setName = setFromPath ?? (instName !== rawName ? cleanName(instName) : null);
   return { variantName, setName };
 }
 
@@ -261,7 +262,7 @@ function scanNode(
       // parseRemoteName extracts clean set+variant names from that path.
       const accessible = compSetName(main);
       const { variantName, setName: parsedSet } = accessible
-        ? { variantName: main.name, setName: accessible }
+        ? { variantName: cleanName(main.name), setName: cleanName(accessible) }
         : parseRemoteName(main.name, inst.name);
       const cacheKey = compCacheKey(variantName, parsedSet);
       if (!components.has(cacheKey)) {

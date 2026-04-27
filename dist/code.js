@@ -71,27 +71,19 @@
     return found;
   }
   function cleanName(name) {
-    return name.replace(/[❖◆◇▾▸]/g, "").replace(/\s{2,}/g, " ").trim();
+    return name.replace(/[\u2000-\u27FF\uE000-\uF8FF]/g, "").replace(/\s{2,}/g, " ").trim();
   }
   function parseRemoteName(rawName, instName) {
+    var _a, _b, _c, _d;
     if (!rawName.includes("/")) {
       return { variantName: cleanName(rawName), setName: null };
     }
-    const parts = rawName.split("/");
-    let setName = null;
-    let variantName = null;
-    for (const part of parts) {
-      if (part.includes("\u2756") && !setName)
-        setName = cleanName(part);
-      else if (part.includes("\u25C6") && !variantName)
-        variantName = cleanName(part);
-    }
-    if (!variantName) {
-      const last = cleanName(parts[parts.length - 1]);
-      variantName = last || cleanName(rawName);
-    }
-    if (!setName && instName && instName !== rawName)
-      setName = cleanName(instName);
+    const parts = rawName.split("/").map(cleanName).filter(Boolean);
+    const start = ((_a = parts[0]) == null ? void 0 : _a.toLowerCase()) === "component" ? 1 : 0;
+    const setFromPath = (_b = parts[start]) != null ? _b : null;
+    const variantFromPath = (_c = parts[start + 1]) != null ? _c : null;
+    const variantName = (_d = variantFromPath != null ? variantFromPath : setFromPath) != null ? _d : cleanName(rawName);
+    const setName = setFromPath != null ? setFromPath : instName !== rawName ? cleanName(instName) : null;
     return { variantName, setName };
   }
   function getStyleName(styleId) {
@@ -212,7 +204,7 @@
       const main = inst.mainComponent;
       if (main) {
         const accessible = compSetName(main);
-        const { variantName, setName: parsedSet } = accessible ? { variantName: main.name, setName: accessible } : parseRemoteName(main.name, inst.name);
+        const { variantName, setName: parsedSet } = accessible ? { variantName: cleanName(main.name), setName: cleanName(accessible) } : parseRemoteName(main.name, inst.name);
         const cacheKey = compCacheKey(variantName, parsedSet);
         if (!components.has(cacheKey)) {
           const localComp = findLocalComponent(variantName, parsedSet, maps.componentCache);
