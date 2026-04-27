@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1e1e1e;
+      --surface: #2c2c2c;
+      --surface2: #383838;
+      --border: #3a3a3a;
+      --text: #e0e0e0;
+      --muted: #888;
+      --accent: #18a0fb;
+      --accent-dim: rgba(24,160,251,0.12);
+      --success: #1bc47d;
+      --success-dim: rgba(27,196,125,0.12);
+      --warn: #f5a623;
+      --danger: #f24822;
+      --danger-dim: rgba(242,72,34,0.1);
+      --r: 6px;
+      --font: 'Inter', -apple-system, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 13px; font-weight: 600; }
+    .header p  { color: var(--muted); font-size: 11px; margin-top: 1px; }
+
+    /* ── Selection strip ── */
+    .sel-strip {
+      padding: 8px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      min-height: 40px;
+    }
+    .sel-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+    .sel-dot.active { background: var(--accent); }
+    .sel-info { overflow: hidden; }
+    .sel-name {
+      font-weight: 600; font-size: 12px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      color: var(--text);
+    }
+    .sel-type { font-size: 10px; color: var(--muted); }
+
+    /* ── Scroll body ── */
+    .body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+    }
+    .body::-webkit-scrollbar { width: 4px; }
+    .body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 28px; margin-bottom: 8px; }
+    .empty-state p { font-size: 11px; line-height: 1.6; }
+
+    /* ── Section ── */
+    .section { margin-bottom: 12px; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .section-count {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* ── Row list ── */
+    .row-list { display: flex; flex-direction: column; gap: 3px; }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      background: var(--surface);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .row .badge {
+      flex-shrink: 0;
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-paint   { background: rgba(255,140,0,0.15);  color: #ff9500; }
+    .badge-text    { background: rgba(24,160,251,0.15); color: #18a0fb; }
+    .badge-effect  { background: rgba(175,82,222,0.15); color: #af52de; }
+    .badge-grid    { background: rgba(52,199,89,0.15);  color: #34c759; }
+    .badge-var     { background: rgba(255,204,0,0.15);  color: #f5c400; }
+    .badge-comp    { background: rgba(242,72,34,0.15);  color: #f24822; }
+
+    .row .name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+    .row .status-icon { flex-shrink: 0; font-size: 11px; }
+    .status-ok   { color: var(--success); }
+    .status-miss { color: var(--danger); }
+
+    /* Show more */
+    .show-more {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-family: var(--font);
+      text-align: left;
+    }
+    .show-more:hover { text-decoration: underline; }
+
+    /* ── Divider ── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+    /* ── Result summary ── */
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 8px;
+      text-align: center;
+    }
+    .result-card.good  { border-color: rgba(27,196,125,0.4); background: var(--success-dim); }
+    .result-card.bad   { border-color: rgba(242,72,34,0.4);  background: var(--danger-dim); }
+    .result-card .val  { font-size: 20px; font-weight: 700; color: var(--text); }
+    .result-card.good .val { color: var(--success); }
+    .result-card.bad  .val { color: var(--danger); }
+    .result-card .lbl  { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+    .missing-list { margin-top: 8px; }
+    .missing-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--danger);
+      margin-bottom: 4px;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: var(--r);
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.12s, opacity 0.12s;
+    }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:not(:disabled):hover { background: #0d90e8; }
+    .btn-ghost {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-ghost:not(:disabled):hover { background: var(--surface2); }
+
+    /* ── Status bar ── */
+    .status-bar {
+      height: 26px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .status-bar.hidden { display: none; }
+    .s-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .status-bar.ok   .s-dot { background: var(--success); }
+    .status-bar.err  .s-dot { background: var(--danger); }
+    .status-bar.busy .s-dot { background: var(--accent); animation: pulse 0.9s infinite; }
+    .status-bar.ok  { color: var(--success); }
+    .status-bar.err { color: var(--danger); }
+    .status-bar.busy{ color: var(--accent); }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Relinker</h1>
+    <p>Relink donor styles, variables &amp; components to local equivalents</p>
+  </div>
+
+  <div class="sel-strip">
+    <div id="sel-dot" class="sel-dot"></div>
+    <div class="sel-info">
+      <div id="sel-name" class="sel-name" style="color:var(--muted)">Nothing selected</div>
+      <div id="sel-type" class="sel-type">Select a Frame or Component</div>
+    </div>
+  </div>
+
+  <div class="body" id="body">
+    <div class="empty-state" id="empty-state">
+      <div class="icon">⇄</div>
+      <p>Select a frame or component you pasted<br>from a donor library.<br><br>
+      The plugin will find all external style,<br>variable and component dependencies<br>
+      and relink them to local equivalents.</p>
+    </div>
+
+    <div id="scan-view" style="display:none"></div>
+    <div id="result-view" style="display:none"></div>
+  </div>
+
+  <div class="footer">
+    <button id="btn-scan" class="btn btn-ghost" disabled>Rescan</button>
+    <button id="btn-relink" class="btn btn-primary" disabled>Relink to local</button>
+  </div>
+
+  <div id="status-bar" class="status-bar hidden">
+    <div class="s-dot"></div>
+    <span id="status-text"></span>
+  </div>
+
+<script>
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+let hasSelection = false;
+let lastScan = null;
+
+const MAX_VISIBLE = 5;
+
+// ─────────────────────────────────────────────
+// DOM refs
+// ─────────────────────────────────────────────
+const selDot    = document.getElementById('sel-dot');
+const selName   = document.getElementById('sel-name');
+const selType   = document.getElementById('sel-type');
+const emptyState= document.getElementById('empty-state');
+const scanView  = document.getElementById('scan-view');
+const resultView= document.getElementById('result-view');
+const btnScan   = document.getElementById('btn-scan');
+const btnRelink = document.getElementById('btn-relink');
+const statusBar = document.getElementById('status-bar');
+const statusTxt = document.getElementById('status-text');
+
+// ─────────────────────────────────────────────
+// Status bar
+// ─────────────────────────────────────────────
+function showStatus(type, text) {
+  statusBar.className = 'status-bar ' + type;
+  statusTxt.textContent = text;
+}
+function hideStatus() { statusBar.className = 'status-bar hidden'; }
+
+// ─────────────────────────────────────────────
+// Selection strip
+// ─────────────────────────────────────────────
+function updateSelectionStrip(info) {
+  hasSelection = info.hasSelection;
+  selDot.className = 'sel-dot' + (info.hasSelection ? ' active' : '');
+  if (info.hasSelection) {
+    selName.textContent = info.name;
+    selName.style.color = '';
+    selType.textContent = info.nodeType;
+  } else {
+    selName.textContent = 'Nothing selected';
+    selName.style.color = 'var(--muted)';
+    selType.textContent = 'Select a Frame or Component';
+    showEmpty();
+  }
+  btnScan.disabled   = !info.hasSelection;
+  btnRelink.disabled = !info.hasSelection;
+}
+
+function showEmpty() {
+  emptyState.style.display = '';
+  scanView.style.display   = 'none';
+  resultView.style.display = 'none';
+}
+
+// ─────────────────────────────────────────────
+// Badge helper
+// ─────────────────────────────────────────────
+const STYLE_BADGE = { PAINT:'paint', TEXT:'text', EFFECT:'effect', GRID:'grid', STYLE:'style' };
+
+function badge(cls, label) {
+  return `<span class="badge badge-${cls}">${label}</span>`;
+}
+
+// ─────────────────────────────────────────────
+// Render scan view
+// ─────────────────────────────────────────────
+function renderScan(scan) {
+  lastScan = scan;
+  resultView.style.display = 'none';
+  emptyState.style.display = 'none';
+
+  const total = scan.styles.length + scan.variables.length + scan.components.length;
+
+  if (total === 0) {
+    scanView.innerHTML = `
+      <div style="text-align:center;padding:32px 16px;color:var(--success)">
+        <div style="font-size:24px;margin-bottom:6px">✓</div>
+        <div style="font-weight:600">No external dependencies found</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:4px">
+          All styles, variables and components are already local.
+        </div>
+      </div>`;
+    scanView.style.display = '';
+    return;
+  }
+
+  const missing = [
+    ...scan.styles.filter(s => !s.hasLocal),
+    ...scan.variables.filter(v => !v.hasLocal),
+    ...scan.components.filter(c => !c.hasLocal),
+  ].length;
+
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:10px">
+    Scanned <strong style="color:var(--text)">${scan.nodesScanned}</strong> nodes — found
+    <strong style="color:var(--text)">${total}</strong> external ${total === 1 ? 'dependency' : 'dependencies'}
+    ${missing > 0 ? `, <strong style="color:var(--danger)">${missing} missing locally</strong>` : ', all matched locally'}.
+  </div>`;
+
+  if (scan.styles.length > 0) {
+    html += renderGroup('Styles', scan.styles, item =>
+      `<div class="row">
+        ${badge(STYLE_BADGE[item.styleType] || 'style', item.styleType)}
+        <span class="name" title="${item.name}">${item.name}</span>
+        <span class="status-icon ${item.hasLocal ? 'status-ok' : 'status-miss'}">${item.hasLocal ? '✓' : '✗'}</span>
+      </div>`
+    );
+  }
+
+  if (scan.variables.length > 0) {
+    html += renderGroup('Variables / Tokens', scan.variables, item =>
+      `<div class="row">
+        ${badge('var', 'VAR')}
+        <span class="name" title="${item.key}">${item.key}</span>
+        <span class="status-icon ${item.hasLocal ? 'status-ok' : 'status-miss'}">${item.hasLocal ? '✓' : '✗'}</span>
+      </div>`
+    );
+  }
+
+  if (scan.components.length > 0) {
+    html += renderGroup('Components', scan.components, item =>
+      `<div class="row">
+        ${badge('comp', 'COMP')}
+        <span class="name" title="${item.name}">${item.name}</span>
+        <span class="status-icon ${item.hasLocal ? 'status-ok' : 'status-miss'}">${item.hasLocal ? '✓' : '✗'}</span>
+      </div>`
+    );
+  }
+
+  scanView.innerHTML = html;
+  scanView.style.display = '';
+
+  // Wire up "show more" buttons
+  scanView.querySelectorAll('.show-more').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const list = btn.previousElementSibling;
+      list.querySelectorAll('.row[style*="display:none"]').forEach(r => r.style.display = '');
+      btn.remove();
+    });
+  });
+}
+
+function renderGroup(title, items, rowFn) {
+  const matched = items.filter(i => i.hasLocal).length;
+  let html = `
+    <div class="section">
+      <div class="section-header">
+        ${title}
+        <span class="section-count">${matched}/${items.length} matched</span>
+      </div>
+      <div class="row-list">`;
+
+  items.forEach((item, i) => {
+    const hidden = i >= MAX_VISIBLE ? ' style="display:none"' : '';
+    html += `<div${hidden}>${rowFn(item)}</div>`;
+  });
+
+  html += '</div>';
+  if (items.length > MAX_VISIBLE) {
+    html += `<button class="show-more">Show ${items.length - MAX_VISIBLE} more…</button>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+// ─────────────────────────────────────────────
+// Render relink result
+// ─────────────────────────────────────────────
+function renderResult(res) {
+  scanView.style.display   = 'none';
+  emptyState.style.display = 'none';
+
+  const relinked = res.stylesRelinked + res.variablesRelinked + res.componentsSwapped;
+  const allMissing = [...res.stylesMissing, ...res.variablesMissing, ...res.componentsMissing];
+  const isClean = allMissing.length === 0;
+
+  let html = `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
+      Processed <strong style="color:var(--text)">${res.nodesProcessed}</strong> nodes.
+    </div>
+    <div class="result-grid">
+      <div class="result-card ${res.stylesRelinked > 0 ? 'good' : ''}">
+        <div class="val">${res.stylesRelinked}</div>
+        <div class="lbl">Styles</div>
+      </div>
+      <div class="result-card ${res.variablesRelinked > 0 ? 'good' : ''}">
+        <div class="val">${res.variablesRelinked}</div>
+        <div class="lbl">Variables</div>
+      </div>
+      <div class="result-card ${res.componentsSwapped > 0 ? 'good' : ''}">
+        <div class="val">${res.componentsSwapped}</div>
+        <div class="lbl">Components</div>
+      </div>
+    </div>`;
+
+  if (relinked === 0 && allMissing.length === 0) {
+    html += `<div style="text-align:center;color:var(--muted);font-size:11px;padding:8px 0">
+      Nothing to relink — no external dependencies detected.
+    </div>`;
+  } else if (isClean) {
+    html += `<div style="text-align:center;color:var(--success);font-size:11px;padding:8px 0;font-weight:600">
+      ✓ All dependencies relinked successfully
+    </div>`;
+  }
+
+  if (allMissing.length > 0) {
+    html += `<hr>
+    <div class="missing-list">
+      <div class="missing-label">Missing locally (${allMissing.length}) — create these to complete relinking</div>
+      <div class="row-list">`;
+    allMissing.slice(0, 20).forEach(name => {
+      html += `<div class="row"><span class="status-icon status-miss">✗</span>
+        <span class="name" title="${name}">${name}</span></div>`;
+    });
+    if (allMissing.length > 20) {
+      html += `<div style="color:var(--muted);font-size:11px;padding:4px 8px">
+        …and ${allMissing.length - 20} more</div>`;
+    }
+    html += '</div></div>';
+  }
+
+  resultView.innerHTML = html;
+  resultView.style.display = '';
+}
+
+// ─────────────────────────────────────────────
+// Button handlers
+// ─────────────────────────────────────────────
+btnScan.addEventListener('click', () => {
+  showStatus('busy', 'Scanning…');
+  parent.postMessage({ pluginMessage: { type: 'scan-selection' } }, '*');
+});
+
+btnRelink.addEventListener('click', () => {
+  showStatus('busy', 'Relinking…');
+  btnRelink.disabled = true;
+  parent.postMessage({ pluginMessage: { type: 'relink-selection' } }, '*');
+});
+
+// ─────────────────────────────────────────────
+// Plugin messages
+// ─────────────────────────────────────────────
+window.onmessage = e => {
+  const msg = e.data.pluginMessage;
+  if (!msg) return;
+
+  switch (msg.type) {
+    case 'selection-info':
+      updateSelectionStrip(msg);
+      hideStatus();
+      break;
+
+    case 'scan-result':
+      renderScan(msg.result);
+      hideStatus();
+      btnRelink.disabled = !hasSelection;
+      break;
+
+    case 'relink-result':
+      renderResult(msg.result);
+      btnRelink.disabled = false;
+      showStatus('ok', `Relinked ${
+        msg.result.stylesRelinked + msg.result.variablesRelinked + msg.result.componentsSwapped
+      } dependencies`);
+      break;
+
+    case 'error':
+      showStatus('err', msg.message);
+      btnRelink.disabled = !hasSelection;
+      break;
+  }
+};
+
+// ─────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────
+parent.postMessage({ pluginMessage: { type: 'get-selection-info' } }, '*');
+</script>
+</body>
+</html>

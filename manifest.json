@@ -1,0 +1,8 @@
+{
+  "name": "Relinker",
+  "id": "import-forge-transfer",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "src/ui.html",
+  "editorType": ["figma"]
+}
