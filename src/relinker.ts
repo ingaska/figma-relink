@@ -58,18 +58,54 @@ function buildLocalMaps(): LocalMaps {
 }
 
 // ---------------------------------------------------------------------------
-// Component lookup — searches all pages lazily, cached per name
+// Component lookup — matches by BOTH component-set name AND variant name
+// so "breakpoint=mobile" inside "Header" never collides with
+// "breakpoint=mobile" inside "SportEntrancePage.Promo"
 // ---------------------------------------------------------------------------
 
-function findLocalComponent(name: string, cache: Map<string, ComponentNode | null>): ComponentNode | null {
-  if (cache.has(name)) return cache.get(name)!;
+function compSetName(comp: ComponentNode): string | null {
+  return comp.parent?.type === 'COMPONENT_SET'
+    ? (comp.parent as ComponentSetNode).name
+    : null;
+}
+
+/** Stable cache key: "SetName/variantName" or just "variantName" for standalone */
+function compCacheKey(variantName: string, setName: string | null): string {
+  return setName ? `${setName}/${variantName}` : variantName;
+}
+
+function findLocalComponent(
+  variantName: string,
+  setName: string | null,
+  cache: Map<string, ComponentNode | null>,
+): ComponentNode | null {
+  const key = compCacheKey(variantName, setName);
+  if (cache.has(key)) return cache.get(key)!;
+
   let found: ComponentNode | null = null;
-  // Search current page first (fastest), then remaining pages
-  for (const page of [figma.currentPage, ...figma.root.children.filter(p => p !== figma.currentPage)]) {
-    found = page.findOne(n => n.type === 'COMPONENT' && n.name === name) as ComponentNode | null;
+  const pages = [figma.currentPage, ...figma.root.children.filter(p => p !== figma.currentPage)];
+
+  for (const page of pages) {
+    if (setName) {
+      // Must match both the variant name AND the parent component-set name
+      found = page.findOne(n =>
+        n.type === 'COMPONENT' &&
+        n.name === variantName &&
+        n.parent?.type === 'COMPONENT_SET' &&
+        (n.parent as ComponentSetNode).name === setName,
+      ) as ComponentNode | null;
+    } else {
+      // Standalone component — match by name, not inside a component set
+      found = page.findOne(n =>
+        n.type === 'COMPONENT' &&
+        n.name === variantName &&
+        n.parent?.type !== 'COMPONENT_SET',
+      ) as ComponentNode | null;
+    }
     if (found) break;
   }
-  cache.set(name, found);
+
+  cache.set(key, found);
   return found;
 }
 
@@ -175,15 +211,19 @@ function scanNode(
     }
   }
 
-  // Instances — find local equivalent by name, compare key to detect donor origin
+  // Instances — match by set+variant name to avoid false positives
   if (node.type === 'INSTANCE') {
     const main = (node as InstanceNode).mainComponent;
-    if (main && !components.has(main.name)) {
-      const localComp = findLocalComponent(main.name, maps.componentCache);
-      const needsSwap = localComp !== null && localComp.key !== main.key;
-      const isForeign = localComp === null || needsSwap;
-      if (isForeign) {
-        components.set(main.name, { name: main.name, hasLocal: localComp !== null });
+    if (main) {
+      const setName = compSetName(main);
+      const cacheKey = compCacheKey(main.name, setName);
+      if (!components.has(cacheKey)) {
+        const localComp = findLocalComponent(main.name, setName, maps.componentCache);
+        const needsSwap = localComp !== null && localComp.key !== main.key;
+        if (localComp === null || needsSwap) {
+          const displayName = setName ? `${setName} / ${main.name}` : main.name;
+          components.set(cacheKey, { name: displayName, hasLocal: localComp !== null });
+        }
       }
     }
     return; // don't recurse into instance children
@@ -315,13 +355,16 @@ function relinkNode(node: SceneNode, maps: LocalMaps, result: RelinkResult): voi
     const inst = node as InstanceNode;
     const main = inst.mainComponent;
     if (main) {
-      const localComp = findLocalComponent(main.name, maps.componentCache);
+      const setName = compSetName(main);
+      const localComp = findLocalComponent(main.name, setName, maps.componentCache);
       if (localComp && localComp.key !== main.key) {
-        // Found a local component with the same name but different origin — swap
         inst.swapComponent(localComp);
         result.componentsSwapped++;
-      } else if (!localComp && !result.componentsMissing.includes(main.name)) {
-        result.componentsMissing.push(main.name);
+      } else if (!localComp) {
+        const displayName = setName ? `${setName} / ${main.name}` : main.name;
+        if (!result.componentsMissing.includes(displayName)) {
+          result.componentsMissing.push(displayName);
+        }
       }
     }
     return; // don't recurse into instance children

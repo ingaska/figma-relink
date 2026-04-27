@@ -35,16 +35,39 @@
     const componentCache = /* @__PURE__ */ new Map();
     return { styles, styleTypeById, localStyleIds, variables, localVarIds, componentCache };
   }
-  function findLocalComponent(name, cache) {
-    if (cache.has(name))
-      return cache.get(name);
+  function compSetName(comp) {
+    var _a;
+    return ((_a = comp.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? comp.parent.name : null;
+  }
+  function compCacheKey(variantName, setName) {
+    return setName ? `${setName}/${variantName}` : variantName;
+  }
+  function findLocalComponent(variantName, setName, cache) {
+    const key = compCacheKey(variantName, setName);
+    if (cache.has(key))
+      return cache.get(key);
     let found = null;
-    for (const page of [figma.currentPage, ...figma.root.children.filter((p) => p !== figma.currentPage)]) {
-      found = page.findOne((n) => n.type === "COMPONENT" && n.name === name);
+    const pages = [figma.currentPage, ...figma.root.children.filter((p) => p !== figma.currentPage)];
+    for (const page of pages) {
+      if (setName) {
+        found = page.findOne(
+          (n) => {
+            var _a;
+            return n.type === "COMPONENT" && n.name === variantName && ((_a = n.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" && n.parent.name === setName;
+          }
+        );
+      } else {
+        found = page.findOne(
+          (n) => {
+            var _a;
+            return n.type === "COMPONENT" && n.name === variantName && ((_a = n.parent) == null ? void 0 : _a.type) !== "COMPONENT_SET";
+          }
+        );
+      }
       if (found)
         break;
     }
-    cache.set(name, found);
+    cache.set(key, found);
     return found;
   }
   function getStyleName(styleId) {
@@ -162,12 +185,16 @@
     }
     if (node.type === "INSTANCE") {
       const main = node.mainComponent;
-      if (main && !components.has(main.name)) {
-        const localComp = findLocalComponent(main.name, maps.componentCache);
-        const needsSwap = localComp !== null && localComp.key !== main.key;
-        const isForeign = localComp === null || needsSwap;
-        if (isForeign) {
-          components.set(main.name, { name: main.name, hasLocal: localComp !== null });
+      if (main) {
+        const setName = compSetName(main);
+        const cacheKey = compCacheKey(main.name, setName);
+        if (!components.has(cacheKey)) {
+          const localComp = findLocalComponent(main.name, setName, maps.componentCache);
+          const needsSwap = localComp !== null && localComp.key !== main.key;
+          if (localComp === null || needsSwap) {
+            const displayName = setName ? `${setName} / ${main.name}` : main.name;
+            components.set(cacheKey, { name: displayName, hasLocal: localComp !== null });
+          }
         }
       }
       return;
@@ -291,12 +318,16 @@
       const inst = node;
       const main = inst.mainComponent;
       if (main) {
-        const localComp = findLocalComponent(main.name, maps.componentCache);
+        const setName = compSetName(main);
+        const localComp = findLocalComponent(main.name, setName, maps.componentCache);
         if (localComp && localComp.key !== main.key) {
           inst.swapComponent(localComp);
           result.componentsSwapped++;
-        } else if (!localComp && !result.componentsMissing.includes(main.name)) {
-          result.componentsMissing.push(main.name);
+        } else if (!localComp) {
+          const displayName = setName ? `${setName} / ${main.name}` : main.name;
+          if (!result.componentsMissing.includes(displayName)) {
+            result.componentsMissing.push(displayName);
+          }
         }
       }
       return;
