@@ -110,6 +110,15 @@ function findLocalComponent(
 }
 
 // ---------------------------------------------------------------------------
+// Name helpers
+// ---------------------------------------------------------------------------
+
+/** Strip Figma layer-type icon characters that appear in remote component names */
+function cleanName(name: string): string {
+  return name.replace(/[❖◆◇▾▸]/g, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+// ---------------------------------------------------------------------------
 // Style helpers
 // ---------------------------------------------------------------------------
 
@@ -213,15 +222,18 @@ function scanNode(
 
   // Instances — match by set+variant name to avoid false positives
   if (node.type === 'INSTANCE') {
-    const main = (node as InstanceNode).mainComponent;
+    const inst = node as InstanceNode;
+    const main = inst.mainComponent;
     if (main) {
-      const setName = compSetName(main);
+      // compSetName() returns null when the remote component's parent is inaccessible.
+      // Fall back to the instance's own name, which Figma keeps as "<SetName>" for variants.
+      const setName = compSetName(main) ?? (inst.name !== main.name ? inst.name : null);
       const cacheKey = compCacheKey(main.name, setName);
       if (!components.has(cacheKey)) {
         const localComp = findLocalComponent(main.name, setName, maps.componentCache);
         const needsSwap = localComp !== null && localComp.key !== main.key;
         if (localComp === null || needsSwap) {
-          const displayName = setName ? `${setName} / ${main.name}` : main.name;
+          const displayName = cleanName(setName ? `${setName} / ${main.name}` : main.name);
           components.set(cacheKey, { name: displayName, hasLocal: localComp !== null });
         }
       }
@@ -355,13 +367,13 @@ function relinkNode(node: SceneNode, maps: LocalMaps, result: RelinkResult): voi
     const inst = node as InstanceNode;
     const main = inst.mainComponent;
     if (main) {
-      const setName = compSetName(main);
+      const setName = compSetName(main) ?? (inst.name !== main.name ? inst.name : null);
       const localComp = findLocalComponent(main.name, setName, maps.componentCache);
       if (localComp && localComp.key !== main.key) {
         inst.swapComponent(localComp);
         result.componentsSwapped++;
       } else if (!localComp) {
-        const displayName = setName ? `${setName} / ${main.name}` : main.name;
+        const displayName = cleanName(setName ? `${setName} / ${main.name}` : main.name);
         if (!result.componentsMissing.includes(displayName)) {
           result.componentsMissing.push(displayName);
         }

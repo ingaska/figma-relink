@@ -70,6 +70,9 @@
     cache.set(key, found);
     return found;
   }
+  function cleanName(name) {
+    return name.replace(/[❖◆◇▾▸]/g, "").replace(/\s{2,}/g, " ").trim();
+  }
   function getStyleName(styleId) {
     var _a, _b;
     try {
@@ -121,7 +124,7 @@
   ];
   var PAINT_VAR_FIELDS = ["color", "opacity", "visible"];
   function scanNode(node, maps, styles, variables, components, counter) {
-    var _a;
+    var _a, _b;
     counter.n++;
     for (const field of STYLE_FIELDS) {
       if (!(field in node))
@@ -184,15 +187,16 @@
       }
     }
     if (node.type === "INSTANCE") {
-      const main = node.mainComponent;
+      const inst = node;
+      const main = inst.mainComponent;
       if (main) {
-        const setName = compSetName(main);
+        const setName = (_b = compSetName(main)) != null ? _b : inst.name !== main.name ? inst.name : null;
         const cacheKey = compCacheKey(main.name, setName);
         if (!components.has(cacheKey)) {
           const localComp = findLocalComponent(main.name, setName, maps.componentCache);
           const needsSwap = localComp !== null && localComp.key !== main.key;
           if (localComp === null || needsSwap) {
-            const displayName = setName ? `${setName} / ${main.name}` : main.name;
+            const displayName = cleanName(setName ? `${setName} / ${main.name}` : main.name);
             components.set(cacheKey, { name: displayName, hasLocal: localComp !== null });
           }
         }
@@ -305,6 +309,7 @@
     });
   }
   function relinkNode(node, maps, result) {
+    var _a;
     result.nodesProcessed++;
     relinkStyles(node, maps, result);
     relinkScalarVars(node, maps, result);
@@ -318,13 +323,13 @@
       const inst = node;
       const main = inst.mainComponent;
       if (main) {
-        const setName = compSetName(main);
+        const setName = (_a = compSetName(main)) != null ? _a : inst.name !== main.name ? inst.name : null;
         const localComp = findLocalComponent(main.name, setName, maps.componentCache);
         if (localComp && localComp.key !== main.key) {
           inst.swapComponent(localComp);
           result.componentsSwapped++;
         } else if (!localComp) {
-          const displayName = setName ? `${setName} / ${main.name}` : main.name;
+          const displayName = cleanName(setName ? `${setName} / ${main.name}` : main.name);
           if (!result.componentsMissing.includes(displayName)) {
             result.componentsMissing.push(displayName);
           }
