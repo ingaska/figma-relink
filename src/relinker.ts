@@ -118,6 +118,36 @@ function cleanName(name: string): string {
   return name.replace(/[❖◆◇▾▸]/g, '').replace(/\s{2,}/g, ' ').trim();
 }
 
+/**
+ * Remote library components sometimes return `mainComponent.name` as a full
+ * hierarchical path like "component/❖ Footer/◆ mobile/paddingTop??".
+ * Parse out the real set name (❖-prefixed segment) and variant name (◆-prefixed
+ * segment or last clean segment) so matching against local components works.
+ */
+function parseRemoteName(
+  rawName: string,
+  instName: string,
+): { variantName: string; setName: string | null } {
+  if (!rawName.includes('/')) {
+    return { variantName: cleanName(rawName), setName: null };
+  }
+  const parts = rawName.split('/');
+  let setName: string | null = null;
+  let variantName: string | null = null;
+  for (const part of parts) {
+    if (part.includes('❖') && !setName) setName = cleanName(part);
+    else if (part.includes('◆') && !variantName) variantName = cleanName(part);
+  }
+  // Fall back: last segment that isn't a plain "component" prefix
+  if (!variantName) {
+    const last = cleanName(parts[parts.length - 1]);
+    variantName = last || cleanName(rawName);
+  }
+  // If still no set name, use the instance's own name (Figma keeps the set name there)
+  if (!setName && instName && instName !== rawName) setName = cleanName(instName);
+  return { variantName, setName };
+}
+
 // ---------------------------------------------------------------------------
 // Style helpers
 // ---------------------------------------------------------------------------
@@ -225,15 +255,20 @@ function scanNode(
     const inst = node as InstanceNode;
     const main = inst.mainComponent;
     if (main) {
-      // compSetName() returns null when the remote component's parent is inaccessible.
-      // Fall back to the instance's own name, which Figma keeps as "<SetName>" for variants.
-      const setName = compSetName(main) ?? (inst.name !== main.name ? inst.name : null);
-      const cacheKey = compCacheKey(main.name, setName);
+      // compSetName() works for local/accessible components.
+      // For remote library components main.parent is inaccessible and may return null,
+      // and main.name can be a garbled full path like "component/❖ Footer/◆ mobile/...".
+      // parseRemoteName extracts clean set+variant names from that path.
+      const accessible = compSetName(main);
+      const { variantName, setName: parsedSet } = accessible
+        ? { variantName: main.name, setName: accessible }
+        : parseRemoteName(main.name, inst.name);
+      const cacheKey = compCacheKey(variantName, parsedSet);
       if (!components.has(cacheKey)) {
-        const localComp = findLocalComponent(main.name, setName, maps.componentCache);
+        const localComp = findLocalComponent(variantName, parsedSet, maps.componentCache);
         const needsSwap = localComp !== null && localComp.key !== main.key;
         if (localComp === null || needsSwap) {
-          const displayName = cleanName(setName ? `${setName} / ${main.name}` : main.name);
+          const displayName = parsedSet ? `${parsedSet} / ${variantName}` : variantName;
           components.set(cacheKey, { name: displayName, hasLocal: localComp !== null });
         }
       }
@@ -367,13 +402,16 @@ function relinkNode(node: SceneNode, maps: LocalMaps, result: RelinkResult): voi
     const inst = node as InstanceNode;
     const main = inst.mainComponent;
     if (main) {
-      const setName = compSetName(main) ?? (inst.name !== main.name ? inst.name : null);
-      const localComp = findLocalComponent(main.name, setName, maps.componentCache);
+      const accessible = compSetName(main);
+      const { variantName, setName } = accessible
+        ? { variantName: main.name, setName: accessible }
+        : parseRemoteName(main.name, inst.name);
+      const localComp = findLocalComponent(variantName, setName, maps.componentCache);
       if (localComp && localComp.key !== main.key) {
         inst.swapComponent(localComp);
         result.componentsSwapped++;
       } else if (!localComp) {
-        const displayName = cleanName(setName ? `${setName} / ${main.name}` : main.name);
+        const displayName = setName ? `${setName} / ${variantName}` : variantName;
         if (!result.componentsMissing.includes(displayName)) {
           result.componentsMissing.push(displayName);
         }

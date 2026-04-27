@@ -73,6 +73,27 @@
   function cleanName(name) {
     return name.replace(/[❖◆◇▾▸]/g, "").replace(/\s{2,}/g, " ").trim();
   }
+  function parseRemoteName(rawName, instName) {
+    if (!rawName.includes("/")) {
+      return { variantName: cleanName(rawName), setName: null };
+    }
+    const parts = rawName.split("/");
+    let setName = null;
+    let variantName = null;
+    for (const part of parts) {
+      if (part.includes("\u2756") && !setName)
+        setName = cleanName(part);
+      else if (part.includes("\u25C6") && !variantName)
+        variantName = cleanName(part);
+    }
+    if (!variantName) {
+      const last = cleanName(parts[parts.length - 1]);
+      variantName = last || cleanName(rawName);
+    }
+    if (!setName && instName && instName !== rawName)
+      setName = cleanName(instName);
+    return { variantName, setName };
+  }
   function getStyleName(styleId) {
     var _a, _b;
     try {
@@ -124,7 +145,7 @@
   ];
   var PAINT_VAR_FIELDS = ["color", "opacity", "visible"];
   function scanNode(node, maps, styles, variables, components, counter) {
-    var _a, _b;
+    var _a;
     counter.n++;
     for (const field of STYLE_FIELDS) {
       if (!(field in node))
@@ -190,13 +211,14 @@
       const inst = node;
       const main = inst.mainComponent;
       if (main) {
-        const setName = (_b = compSetName(main)) != null ? _b : inst.name !== main.name ? inst.name : null;
-        const cacheKey = compCacheKey(main.name, setName);
+        const accessible = compSetName(main);
+        const { variantName, setName: parsedSet } = accessible ? { variantName: main.name, setName: accessible } : parseRemoteName(main.name, inst.name);
+        const cacheKey = compCacheKey(variantName, parsedSet);
         if (!components.has(cacheKey)) {
-          const localComp = findLocalComponent(main.name, setName, maps.componentCache);
+          const localComp = findLocalComponent(variantName, parsedSet, maps.componentCache);
           const needsSwap = localComp !== null && localComp.key !== main.key;
           if (localComp === null || needsSwap) {
-            const displayName = cleanName(setName ? `${setName} / ${main.name}` : main.name);
+            const displayName = parsedSet ? `${parsedSet} / ${variantName}` : variantName;
             components.set(cacheKey, { name: displayName, hasLocal: localComp !== null });
           }
         }
@@ -309,7 +331,6 @@
     });
   }
   function relinkNode(node, maps, result) {
-    var _a;
     result.nodesProcessed++;
     relinkStyles(node, maps, result);
     relinkScalarVars(node, maps, result);
@@ -323,13 +344,14 @@
       const inst = node;
       const main = inst.mainComponent;
       if (main) {
-        const setName = (_a = compSetName(main)) != null ? _a : inst.name !== main.name ? inst.name : null;
-        const localComp = findLocalComponent(main.name, setName, maps.componentCache);
+        const accessible = compSetName(main);
+        const { variantName, setName } = accessible ? { variantName: main.name, setName: accessible } : parseRemoteName(main.name, inst.name);
+        const localComp = findLocalComponent(variantName, setName, maps.componentCache);
         if (localComp && localComp.key !== main.key) {
           inst.swapComponent(localComp);
           result.componentsSwapped++;
         } else if (!localComp) {
-          const displayName = cleanName(setName ? `${setName} / ${main.name}` : main.name);
+          const displayName = setName ? `${setName} / ${variantName}` : variantName;
           if (!result.componentsMissing.includes(displayName)) {
             result.componentsMissing.push(displayName);
           }
