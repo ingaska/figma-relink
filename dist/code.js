@@ -42,12 +42,28 @@
   function compCacheKey(variantName, setName) {
     return setName ? `${setName}/${variantName}` : variantName;
   }
-  function findLocalComponent(variantName, setName, cache) {
+  function getVariantProps(inst) {
+    try {
+      const cp = inst.componentProperties;
+      if (!cp)
+        return {};
+      const out = {};
+      for (const [k, p] of Object.entries(cp)) {
+        if (p.type === "VARIANT" && typeof p.value === "string")
+          out[k] = p.value;
+      }
+      return out;
+    } catch (e) {
+      return {};
+    }
+  }
+  function findLocalComponent(variantName, setName, cache, variantProps) {
     const key = compCacheKey(variantName, setName);
     if (cache.has(key))
       return cache.get(key);
     let found = null;
     const pages = [figma.currentPage, ...figma.root.children.filter((p) => p !== figma.currentPage)];
+    const hasFallbackProps = variantProps && Object.keys(variantProps).length > 0;
     for (const page of pages) {
       if (setName) {
         found = page.findOne(
@@ -56,6 +72,21 @@
             return n.type === "COMPONENT" && n.name === variantName && ((_a = n.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" && n.parent.name === setName;
           }
         );
+        if (!found && hasFallbackProps) {
+          found = page.findOne((n) => {
+            var _a;
+            if (n.type !== "COMPONENT")
+              return false;
+            if (((_a = n.parent) == null ? void 0 : _a.type) !== "COMPONENT_SET")
+              return false;
+            if (n.parent.name !== setName)
+              return false;
+            const vp = n.variantProperties;
+            if (!vp)
+              return false;
+            return Object.entries(variantProps).every(([k, v]) => vp[k] === v);
+          });
+        }
       } else {
         found = page.findOne(
           (n) => {
@@ -137,7 +168,7 @@
   ];
   var PAINT_VAR_FIELDS = ["color", "opacity", "visible"];
   function scanNode(node, maps, styles, variables, components, counter) {
-    var _a;
+    var _a, _b;
     counter.n++;
     for (const field of STYLE_FIELDS) {
       if (!(field in node))
@@ -204,13 +235,16 @@
       const main = inst.mainComponent;
       if (main) {
         const accessible = compSetName(main);
+        const isRemote = !accessible;
         const { variantName, setName: parsedSet } = accessible ? { variantName: cleanName(main.name), setName: cleanName(accessible) } : parseRemoteName(main.name, inst.name);
+        const variantProps = isRemote ? getVariantProps(inst) : void 0;
         const cacheKey = compCacheKey(variantName, parsedSet);
         if (!components.has(cacheKey)) {
-          const localComp = findLocalComponent(variantName, parsedSet, maps.componentCache);
+          const localComp = findLocalComponent(variantName, parsedSet, maps.componentCache, variantProps);
           const needsSwap = localComp !== null && localComp.key !== main.key;
           if (localComp === null || needsSwap) {
-            const displayName = parsedSet ? `${parsedSet} / ${variantName}` : variantName;
+            const resolvedVariant = (_b = localComp == null ? void 0 : localComp.name) != null ? _b : variantProps && Object.keys(variantProps).length > 0 ? Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(", ") : variantName;
+            const displayName = parsedSet ? `${parsedSet} / ${resolvedVariant}` : resolvedVariant;
             components.set(cacheKey, { name: displayName, hasLocal: localComp !== null });
           }
         }
@@ -337,13 +371,16 @@
       const main = inst.mainComponent;
       if (main) {
         const accessible = compSetName(main);
-        const { variantName, setName } = accessible ? { variantName: main.name, setName: accessible } : parseRemoteName(main.name, inst.name);
-        const localComp = findLocalComponent(variantName, setName, maps.componentCache);
+        const isRemote = !accessible;
+        const { variantName, setName } = accessible ? { variantName: cleanName(main.name), setName: cleanName(accessible) } : parseRemoteName(main.name, inst.name);
+        const variantProps = isRemote ? getVariantProps(inst) : void 0;
+        const localComp = findLocalComponent(variantName, setName, maps.componentCache, variantProps);
         if (localComp && localComp.key !== main.key) {
           inst.swapComponent(localComp);
           result.componentsSwapped++;
         } else if (!localComp) {
-          const displayName = setName ? `${setName} / ${variantName}` : variantName;
+          const resolvedVariant = variantProps && Object.keys(variantProps).length > 0 ? Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(", ") : variantName;
+          const displayName = setName ? `${setName} / ${resolvedVariant}` : resolvedVariant;
           if (!result.componentsMissing.includes(displayName)) {
             result.componentsMissing.push(displayName);
           }

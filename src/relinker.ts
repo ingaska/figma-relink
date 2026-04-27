@@ -74,28 +74,60 @@ function compCacheKey(variantName: string, setName: string | null): string {
   return setName ? `${setName}/${variantName}` : variantName;
 }
 
+/**
+ * Extract VARIANT-type component properties from an instance.
+ * Used as a fallback when mainComponent.name is garbled (remote/inaccessible library).
+ * Returns e.g. { breakpoint: "mobile" } from componentProperties.
+ */
+function getVariantProps(inst: InstanceNode): Record<string, string> {
+  try {
+    const cp = (inst as unknown as Record<string, unknown>).componentProperties as
+      Record<string, { type: string; value: unknown }> | undefined;
+    if (!cp) return {};
+    const out: Record<string, string> = {};
+    for (const [k, p] of Object.entries(cp)) {
+      if (p.type === 'VARIANT' && typeof p.value === 'string') out[k] = p.value;
+    }
+    return out;
+  } catch { return {}; }
+}
+
 function findLocalComponent(
   variantName: string,
   setName: string | null,
   cache: Map<string, ComponentNode | null>,
+  variantProps?: Record<string, string>,
 ): ComponentNode | null {
   const key = compCacheKey(variantName, setName);
   if (cache.has(key)) return cache.get(key)!;
 
   let found: ComponentNode | null = null;
   const pages = [figma.currentPage, ...figma.root.children.filter(p => p !== figma.currentPage)];
+  const hasFallbackProps = variantProps && Object.keys(variantProps).length > 0;
 
   for (const page of pages) {
     if (setName) {
-      // Must match both the variant name AND the parent component-set name
+      // Primary: exact name + set name match
       found = page.findOne(n =>
         n.type === 'COMPONENT' &&
         n.name === variantName &&
         n.parent?.type === 'COMPONENT_SET' &&
         (n.parent as ComponentSetNode).name === setName,
       ) as ComponentNode | null;
+
+      // Fallback: match by variant property values inside the named set.
+      // Needed when mainComponent.name is garbled (e.g. "◆ mobile" instead of "breakpoint=mobile").
+      if (!found && hasFallbackProps) {
+        found = page.findOne(n => {
+          if (n.type !== 'COMPONENT') return false;
+          if (n.parent?.type !== 'COMPONENT_SET') return false;
+          if ((n.parent as ComponentSetNode).name !== setName) return false;
+          const vp = (n as ComponentNode).variantProperties;
+          if (!vp) return false;
+          return Object.entries(variantProps!).every(([k, v]) => vp[k] === v);
+        }) as ComponentNode | null;
+      }
     } else {
-      // Standalone component — match by name, not inside a component set
       found = page.findOne(n =>
         n.type === 'COMPONENT' &&
         n.name === variantName &&
@@ -256,20 +288,25 @@ function scanNode(
     const inst = node as InstanceNode;
     const main = inst.mainComponent;
     if (main) {
-      // compSetName() works for local/accessible components.
-      // For remote library components main.parent is inaccessible and may return null,
-      // and main.name can be a garbled full path like "component/❖ Footer/◆ mobile/...".
-      // parseRemoteName extracts clean set+variant names from that path.
       const accessible = compSetName(main);
+      const isRemote = !accessible;
       const { variantName, setName: parsedSet } = accessible
         ? { variantName: cleanName(main.name), setName: cleanName(accessible) }
         : parseRemoteName(main.name, inst.name);
+      // For remote components with garbled names, fall back to property-based matching
+      const variantProps = isRemote ? getVariantProps(inst) : undefined;
       const cacheKey = compCacheKey(variantName, parsedSet);
       if (!components.has(cacheKey)) {
-        const localComp = findLocalComponent(variantName, parsedSet, maps.componentCache);
+        const localComp = findLocalComponent(variantName, parsedSet, maps.componentCache, variantProps);
         const needsSwap = localComp !== null && localComp.key !== main.key;
         if (localComp === null || needsSwap) {
-          const displayName = parsedSet ? `${parsedSet} / ${variantName}` : variantName;
+          // Use the found component's real name if available; otherwise build from props
+          const resolvedVariant = localComp?.name ?? (
+            variantProps && Object.keys(variantProps).length > 0
+              ? Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(', ')
+              : variantName
+          );
+          const displayName = parsedSet ? `${parsedSet} / ${resolvedVariant}` : resolvedVariant;
           components.set(cacheKey, { name: displayName, hasLocal: localComp !== null });
         }
       }
@@ -404,15 +441,20 @@ function relinkNode(node: SceneNode, maps: LocalMaps, result: RelinkResult): voi
     const main = inst.mainComponent;
     if (main) {
       const accessible = compSetName(main);
+      const isRemote = !accessible;
       const { variantName, setName } = accessible
-        ? { variantName: main.name, setName: accessible }
+        ? { variantName: cleanName(main.name), setName: cleanName(accessible) }
         : parseRemoteName(main.name, inst.name);
-      const localComp = findLocalComponent(variantName, setName, maps.componentCache);
+      const variantProps = isRemote ? getVariantProps(inst) : undefined;
+      const localComp = findLocalComponent(variantName, setName, maps.componentCache, variantProps);
       if (localComp && localComp.key !== main.key) {
         inst.swapComponent(localComp);
         result.componentsSwapped++;
       } else if (!localComp) {
-        const displayName = setName ? `${setName} / ${variantName}` : variantName;
+        const resolvedVariant = variantProps && Object.keys(variantProps).length > 0
+          ? Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(', ')
+          : variantName;
+        const displayName = setName ? `${setName} / ${resolvedVariant}` : resolvedVariant;
         if (!result.componentsMissing.includes(displayName)) {
           result.componentsMissing.push(displayName);
         }
