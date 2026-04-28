@@ -1,45 +1,25 @@
-export interface StyleEntry {
+export interface LogEntry {
+  status:   'ok' | 'missing' | 'error';
+  category: 'style' | 'variable' | 'component';
   name: string;
-  styleType: string; // 'PAINT' | 'TEXT' | 'EFFECT' | 'GRID'
-  hasLocal: boolean;
-}
-
-export interface VarEntry {
-  key: string; // "Collection/Name"
-  hasLocal: boolean;
-}
-
-export interface CompEntry {
-  name: string;
-  hasLocal: boolean;
-}
-
-export interface ScanResult {
-  styles: StyleEntry[];
-  variables: VarEntry[];
-  components: CompEntry[];
-  nodesScanned: number;
 }
 
 export interface RelinkResult {
-  stylesRelinked: number;
-  stylesMissing: string[];
+  stylesRelinked:    number;
   variablesRelinked: number;
-  variablesMissing: string[];
   componentsSwapped: number;
-  componentsMissing: string[];
-  errors: string[];        // non-fatal errors — relink continues past these
+  missing: string[];   // items not found locally
+  errors:  string[];   // items found but failed to apply
+  log:     LogEntry[]; // full ordered action log
   nodesProcessed: number;
 }
 
 export type PluginMessage =
-  | { type: 'scan-selection' }
   | { type: 'relink-selection' }
   | { type: 'get-selection-info' }
   | { type: 'close' };
 
 export type UIMessage =
   | { type: 'selection-info'; hasSelection: boolean; name: string; nodeType: string }
-  | { type: 'scan-result'; result: ScanResult }
   | { type: 'relink-result'; result: RelinkResult }
   | { type: 'error'; message: string };

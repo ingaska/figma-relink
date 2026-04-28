@@ -39,7 +39,16 @@
       }
     } catch (e) {
     }
-    return { paintStyles, textStyles, effectStyles, gridStyles, localStyleIds, variables, localVarIds, compCache: /* @__PURE__ */ new Map() };
+    return {
+      paintStyles,
+      textStyles,
+      effectStyles,
+      gridStyles,
+      localStyleIds,
+      variables,
+      localVarIds,
+      compCache: /* @__PURE__ */ new Map()
+    };
   }
   function getSetName(main, inst) {
     var _a;
@@ -135,114 +144,8 @@
     "counterAxisSpacing"
   ];
   var PAINT_VAR_FIELDS = ["color", "opacity", "visible"];
-  function compDisplayName(setName, variantProps, fallback) {
-    const varStr = Object.keys(variantProps).length > 0 ? Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(", ") : fallback;
-    return `${setName} / ${varStr}`;
-  }
-  function scanNode(node, maps, out, counter) {
-    var _a;
-    counter.n++;
-    for (const { field, getMap } of STYLE_FIELDS) {
-      if (!(field in node))
-        continue;
-      const rawId = node[field];
-      if (!rawId || rawId === figma.mixed)
-        continue;
-      const id = rawId;
-      if (maps.localStyleIds.has(id) || out.styles.has(id))
-        continue;
-      const style = figma.getStyleById(id);
-      if (!style)
-        continue;
-      out.styles.set(id, { name: style.name, styleType: style.type, hasLocal: getMap(maps).has(style.name) });
-    }
-    if ("boundVariables" in node) {
-      const bv = node.boundVariables;
-      if (bv) {
-        for (const f of SCALAR_VAR_FIELDS) {
-          const alias = bv[f];
-          if (!(alias == null ? void 0 : alias.id))
-            continue;
-          if (maps.localVarIds.has(alias.id))
-            continue;
-          const v = resolveVar(alias);
-          if (!v)
-            continue;
-          const key = varKey(v);
-          if (!out.vars.has(key))
-            out.vars.set(key, { key, hasLocal: maps.variables.has(key) });
-        }
-      }
-    }
-    for (const prop of ["fills", "strokes"]) {
-      if (!(prop in node))
-        continue;
-      const paints = node[prop];
-      if (!paints || paints === figma.mixed)
-        continue;
-      for (const paint of paints) {
-        if (!paint.boundVariables)
-          continue;
-        for (const pf of PAINT_VAR_FIELDS) {
-          const alias = paint.boundVariables[pf];
-          if (!alias || Array.isArray(alias))
-            continue;
-          const a = alias;
-          if (maps.localVarIds.has(a.id))
-            continue;
-          const v = resolveVar(a);
-          if (!v)
-            continue;
-          const key = varKey(v);
-          if (!out.vars.has(key))
-            out.vars.set(key, { key, hasLocal: maps.variables.has(key) });
-        }
-      }
-    }
-    if (node.type === "INSTANCE") {
-      const inst = node;
-      const main = inst.mainComponent;
-      if (main) {
-        const setName = getSetName(main, inst);
-        if (setName) {
-          const variantProps = getVariantProps(inst);
-          const cacheKey = `${setName}\0${JSON.stringify(Object.entries(variantProps).sort())}`;
-          if (!out.comps.has(cacheKey)) {
-            const local = findLocalVariant(setName, variantProps, maps.compCache);
-            const needsSwap = local !== null && local.key !== main.key;
-            if (local === null || needsSwap) {
-              const display = compDisplayName(setName, variantProps, (_a = local == null ? void 0 : local.name) != null ? _a : main.name);
-              out.comps.set(cacheKey, { name: display, hasLocal: local !== null });
-            }
-          }
-        }
-      }
-      return;
-    }
-    if ("children" in node) {
-      for (const child of node.children)
-        scanNode(child, maps, out, counter);
-    }
-  }
-  function scanSelection() {
-    const sel = figma.currentPage.selection;
-    if (sel.length === 0)
-      throw new Error("Select a frame or component first.");
-    const maps = buildMaps();
-    const out = {
-      styles: /* @__PURE__ */ new Map(),
-      vars: /* @__PURE__ */ new Map(),
-      comps: /* @__PURE__ */ new Map()
-    };
-    const counter = { n: 0 };
-    for (const node of sel)
-      scanNode(node, maps, out, counter);
-    return {
-      styles: [...out.styles.values()],
-      variables: [...out.vars.values()],
-      components: [...out.comps.values()],
-      nodesScanned: counter.n
-    };
+  function push(result, entry) {
+    result.log.push(entry);
   }
   function relinkNode(node, maps, result) {
     result.nodesProcessed++;
@@ -263,11 +166,16 @@
         try {
           node[field] = localId;
           result.stylesRelinked++;
+          push(result, { status: "ok", category: "style", name: style.name });
         } catch (e) {
-          result.errors.push(`Style "${style.name}": ${e instanceof Error ? e.message : e}`);
+          const msg = `Style "${style.name}": ${e instanceof Error ? e.message : e}`;
+          result.errors.push(msg);
+          push(result, { status: "error", category: "style", name: style.name });
         }
-      } else if (!result.stylesMissing.includes(style.name)) {
-        result.stylesMissing.push(style.name);
+      } else {
+        if (!result.missing.includes(style.name))
+          result.missing.push(style.name);
+        push(result, { status: "missing", category: "style", name: style.name });
       }
     }
     if ("boundVariables" in node) {
@@ -288,11 +196,16 @@
             try {
               node.setBoundVariable(f, localVar);
               result.variablesRelinked++;
+              push(result, { status: "ok", category: "variable", name: key });
             } catch (e) {
-              result.errors.push(`Variable "${key}": ${e instanceof Error ? e.message : e}`);
+              const msg = `Variable "${key}": ${e instanceof Error ? e.message : e}`;
+              result.errors.push(msg);
+              push(result, { status: "error", category: "variable", name: key });
             }
-          } else if (!result.variablesMissing.includes(key)) {
-            result.variablesMissing.push(key);
+          } else {
+            if (!result.missing.includes(key))
+              result.missing.push(key);
+            push(result, { status: "missing", category: "variable", name: key });
           }
         }
       }
@@ -325,10 +238,15 @@
               p = figma.variables.setBoundVariableForPaint(p, pf, localVar);
               result.variablesRelinked++;
               dirty = true;
+              push(result, { status: "ok", category: "variable", name: key });
             } catch (e) {
+              result.errors.push(`Variable "${key}": ${e instanceof Error ? e.message : e}`);
+              push(result, { status: "error", category: "variable", name: key });
             }
-          } else if (!result.variablesMissing.includes(key)) {
-            result.variablesMissing.push(key);
+          } else {
+            if (!result.missing.includes(key))
+              result.missing.push(key);
+            push(result, { status: "missing", category: "variable", name: key });
           }
         }
         return p;
@@ -344,22 +262,23 @@
         if (setName) {
           const variantProps = getVariantProps(inst);
           const local = findLocalVariant(setName, variantProps, maps.compCache);
+          const display = Object.keys(variantProps).length > 0 ? `${setName} / ${Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(", ")}` : setName;
           if (local && local.key !== main.key) {
             try {
               inst.swapComponent(local);
               result.componentsSwapped++;
+              push(result, { status: "ok", category: "component", name: display });
             } catch (e) {
-              const display = compDisplayName(setName, variantProps, main.name);
               result.errors.push(`Component "${display}": ${e instanceof Error ? e.message : e}`);
+              push(result, { status: "error", category: "component", name: display });
             }
           } else if (!local) {
-            const display = compDisplayName(setName, variantProps, main.name);
-            if (!result.componentsMissing.includes(display))
-              result.componentsMissing.push(display);
+            if (!result.missing.includes(display))
+              result.missing.push(display);
+            push(result, { status: "missing", category: "component", name: display });
           }
         }
       }
-      return;
     }
     if ("children" in node) {
       for (const child of node.children)
@@ -373,12 +292,11 @@
     const maps = buildMaps();
     const result = {
       stylesRelinked: 0,
-      stylesMissing: [],
       variablesRelinked: 0,
-      variablesMissing: [],
       componentsSwapped: 0,
-      componentsMissing: [],
+      missing: [],
       errors: [],
+      log: [],
       nodesProcessed: 0
     };
     for (const node of sel)
@@ -387,17 +305,13 @@
   }
 
   // src/code.ts
-  figma.showUI(__html__, { width: 360, height: 480, title: "Import Forge" });
+  figma.showUI(__html__, { width: 360, height: 520, title: "Relinker" });
   function send(msg) {
     figma.ui.postMessage(msg);
   }
   function pushSelectionInfo() {
     const sel = figma.currentPage.selection;
-    if (sel.length === 0) {
-      send({ type: "selection-info", hasSelection: false, name: "", nodeType: "" });
-    } else {
-      send({ type: "selection-info", hasSelection: true, name: sel[0].name, nodeType: sel[0].type });
-    }
+    send(sel.length === 0 ? { type: "selection-info", hasSelection: false, name: "", nodeType: "" } : { type: "selection-info", hasSelection: true, name: sel[0].name, nodeType: sel[0].type });
   }
   figma.on("selectionchange", pushSelectionInfo);
   figma.ui.onmessage = (msg) => {
@@ -405,9 +319,6 @@
       switch (msg.type) {
         case "get-selection-info":
           pushSelectionInfo();
-          break;
-        case "scan-selection":
-          send({ type: "scan-result", result: scanSelection() });
           break;
         case "relink-selection":
           send({ type: "relink-result", result: relinkSelection() });

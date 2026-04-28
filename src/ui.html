@@ -1,651 +1,362 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1e1e1e;--surface:#262626;--surface2:#313131;--border:#393939;
+  --text:#e0e0e0;--muted:#737373;
+  --accent:#18a0fb;
+  --ok:#1bc47d;    --ok-dim:rgba(27,196,125,.1);
+  --miss:#f5a623;  --miss-dim:rgba(245,166,35,.1);
+  --err:#f24822;   --err-dim:rgba(242,72,34,.09);
+  --r:6px;--font:'Inter',-apple-system,sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);
+  font-size:12px;line-height:1.5;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 
-    :root {
-      --bg:          #1e1e1e;
-      --surface:     #2c2c2c;
-      --surface2:    #383838;
-      --border:      #3a3a3a;
-      --text:        #e0e0e0;
-      --muted:       #888;
-      --accent:      #18a0fb;
-      --success:     #1bc47d;
-      --success-dim: rgba(27,196,125,0.1);
-      --warn:        #f5a623;
-      --danger:      #f24822;
-      --danger-dim:  rgba(242,72,34,0.08);
-      --r: 6px;
-      --font: 'Inter', -apple-system, sans-serif;
-    }
+/* ── header ── */
+.header{padding:11px 14px 9px;border-bottom:1px solid var(--border);flex-shrink:0;
+  display:flex;align-items:center;gap:8px}
+.header h1{font-size:13px;font-weight:700;flex:1}
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 12px;
-      line-height: 1.5;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
+/* ── selection strip ── */
+.sel{padding:7px 14px;background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;display:flex;align-items:center;gap:8px;min-height:36px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--border);flex-shrink:0}
+.dot.on{background:var(--accent)}
+.sel-name{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sel-type{font-size:10px;color:var(--muted)}
 
-    /* Header */
-    .header {
-      padding: 12px 14px 10px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .header h1 { font-size: 13px; font-weight: 600; flex: 1; }
+/* ── body ── */
+.body{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.body::-webkit-scrollbar{width:4px}
+.body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
-    /* Selection strip */
-    .sel-strip {
-      padding: 8px 14px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-      min-height: 38px;
-    }
-    .sel-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
-    .sel-dot.active { background: var(--accent); }
-    .sel-name { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sel-type { font-size: 10px; color: var(--muted); }
+/* ── idle / empty state ── */
+.idle{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:24px 20px;text-align:center;color:var(--muted)}
+.idle .ico{font-size:28px;opacity:.6}
+.idle .title{font-size:13px;font-weight:600;color:var(--text)}
+.idle .desc{font-size:11px;line-height:1.65;max-width:210px}
 
-    /* Scrollable body */
-    .body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-    .body::-webkit-scrollbar { width: 4px; }
-    .body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+/* ── summary bar (inside body, sticky top when log is shown) ── */
+.summary{
+  display:flex;align-items:stretch;gap:1px;
+  border-bottom:1px solid var(--border);
+  background:var(--border);
+  flex-shrink:0;
+}
+.stat{flex:1;background:var(--surface);padding:8px 6px;text-align:center}
+.stat .val{font-size:18px;font-weight:700;line-height:1}
+.stat .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:2px}
+.stat.s-ok   .val{color:var(--ok)}
+.stat.s-miss .val{color:var(--miss)}
+.stat.s-err  .val{color:var(--err)}
+.stat.s-zero .val{color:var(--muted)}
 
-    /* Empty / prompt states */
-    .state-center {
-      text-align: center;
-      padding: 28px 16px;
-      color: var(--muted);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-    .state-center .icon { font-size: 26px; }
-    .state-center .title { font-size: 13px; font-weight: 600; color: var(--text); }
-    .state-center .desc { font-size: 11px; line-height: 1.6; max-width: 220px; }
+/* ── log ── */
+.log{flex:1;overflow-y:auto;padding:6px 0}
+.log::-webkit-scrollbar{width:4px}
+.log::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
-    /* Banner */
-    .banner {
-      padding: 9px 11px;
-      border-radius: var(--r);
-      border: 1px solid;
-      font-size: 11px;
-      line-height: 1.5;
-    }
-    .banner.info    { border-color: rgba(24,160,251,0.3); background: rgba(24,160,251,0.07); color: var(--accent); }
-    .banner.warn    { border-color: rgba(245,166,35,0.3); background: rgba(245,166,35,0.07); color: var(--warn); }
-    .banner.success { border-color: rgba(27,196,125,0.3); background: var(--success-dim);    color: var(--success); }
-    .banner.danger  { border-color: rgba(242,72,34,0.3);  background: var(--danger-dim);     color: var(--danger); }
-    .banner strong  { font-weight: 700; }
+.log-group{margin-bottom:0}
+.log-group-hdr{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 14px 3px;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);position:sticky;top:0;background:var(--bg);z-index:1;
+  border-top:1px solid var(--border);
+}
+.log-group-hdr:first-child{border-top:none}
+.group-count{
+  margin-left:auto;font-size:10px;font-weight:700;padding:1px 7px;
+  border-radius:10px;letter-spacing:0
+}
+.gc-ok   {background:var(--ok-dim);  color:var(--ok)}
+.gc-miss {background:var(--miss-dim);color:var(--miss)}
+.gc-err  {background:var(--err-dim); color:var(--err)}
 
-    /* Section */
-    .section { display: flex; flex-direction: column; gap: 4px; }
-    .section-hdr {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--muted);
-    }
-    .section-hdr .pill {
-      margin-left: auto;
-      font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 10px;
-      font-weight: 700;
-    }
-    .pill-ok   { background: rgba(27,196,125,0.15); color: var(--success); }
-    .pill-miss { background: rgba(242,72,34,0.15);  color: var(--danger); }
-    .pill-warn { background: rgba(245,166,35,0.15); color: var(--warn); }
+.log-row{
+  display:flex;align-items:center;gap:8px;
+  padding:4px 14px;
+  font-size:11px;
+  border-bottom:1px solid transparent;
+  transition:background .1s;
+}
+.log-row:hover{background:var(--surface)}
+.log-row .icon{flex-shrink:0;font-size:12px;width:14px;text-align:center}
+.icon-ok   {color:var(--ok)}
+.icon-miss {color:var(--miss)}
+.icon-err  {color:var(--err)}
+.log-row .cat{
+  flex-shrink:0;font-size:9px;font-weight:700;text-transform:uppercase;
+  padding:1px 5px;border-radius:3px;letter-spacing:.04em
+}
+.cat-style   {background:rgba(24,160,251,.14);color:#18a0fb}
+.cat-variable{background:rgba(255,204,0,.14);color:#f5c400}
+.cat-component{background:rgba(242,72,34,.14);color:#f24822}
+.log-row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 
-    /* Row */
-    .row-list { display: flex; flex-direction: column; gap: 2px; }
-    .row {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      padding: 4px 8px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-size: 11px;
-    }
-    .row.ok-row   { border-color: rgba(27,196,125,0.2); }
-    .row.miss-row { border-color: rgba(242,72,34,0.2); }
-    .row .badge {
-      flex-shrink: 0;
-      font-size: 9px;
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .b-paint  { background: rgba(255,140,0,.15); color:#ff9500; }
-    .b-text   { background: rgba(24,160,251,.15); color:#18a0fb; }
-    .b-effect { background: rgba(175,82,222,.15); color:#af52de; }
-    .b-grid   { background: rgba(52,199,89,.15);  color:#34c759; }
-    .b-var    { background: rgba(255,204,0,.15);  color:#f5c400; }
-    .b-comp   { background: rgba(242,72,34,.15);  color:#f24822; }
-    .row .name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
-    .row .si   { flex-shrink:0; font-size:11px; }
-    .si-ok     { color: var(--success); }
-    .si-miss   { color: var(--danger); }
-    .si-err    { color: var(--warn); }
+/* ── show more ── */
+.show-more-row{padding:4px 14px}
+.show-more{background:none;border:none;color:var(--accent);font-size:11px;
+  cursor:pointer;padding:0;font-family:var(--font)}
+.show-more:hover{text-decoration:underline}
 
-    .show-more {
-      background: none; border: none;
-      color: var(--accent); font-size: 11px;
-      cursor: pointer; padding: 3px 8px;
-      font-family: var(--font); text-align: left;
-    }
-    .show-more:hover { text-decoration: underline; }
+/* ── footer ── */
+.footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:8px}
+.btn{flex:1;padding:8px 12px;border-radius:var(--r);font-family:var(--font);
+  font-size:12px;font-weight:600;cursor:pointer;border:none;transition:background .12s,opacity .12s}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:not(:disabled):hover{background:#0d90e8}
+.btn-ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.btn-ghost:not(:disabled):hover{background:#404040}
 
-    hr { border: none; border-top: 1px solid var(--border); }
-
-    /* Result stat grid */
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
-    }
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--r);
-      padding: 8px 6px;
-      text-align: center;
-    }
-    .stat-card.c-ok  { border-color: rgba(27,196,125,.4); background: var(--success-dim); }
-    .stat-card.c-err { border-color: rgba(245,166,35,.4); background: rgba(245,166,35,.07); }
-    .stat-card .val { font-size: 20px; font-weight: 700; }
-    .stat-card.c-ok  .val { color: var(--success); }
-    .stat-card.c-err .val { color: var(--warn); }
-    .stat-card .lbl { font-size: 10px; color: var(--muted); margin-top: 1px; }
-
-    /* Footer */
-    .footer {
-      padding: 10px 14px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-      display: flex;
-      gap: 8px;
-    }
-    .btn {
-      flex: 1;
-      padding: 8px 12px;
-      border-radius: var(--r);
-      font-family: var(--font);
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: background .12s, opacity .12s;
-    }
-    .btn:disabled { opacity: .35; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:not(:disabled):hover { background: #0d90e8; }
-    .btn-success { background: var(--success); color: #fff; }
-    .btn-success:not(:disabled):hover { background: #17ad6d; }
-    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
-    .btn-ghost:not(:disabled):hover { background: var(--surface2); }
-
-    /* Status bar */
-    .status-bar {
-      height: 26px; padding: 0 14px;
-      display: flex; align-items: center; gap: 6px;
-      font-size: 11px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .status-bar.hidden { display: none; }
-    .s-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-    .status-bar.ok   .s-dot { background: var(--success); }
-    .status-bar.err  .s-dot { background: var(--danger); }
-    .status-bar.warn .s-dot { background: var(--warn); }
-    .status-bar.busy .s-dot { background: var(--accent); animation: pulse .9s infinite; }
-    .status-bar.ok   { color: var(--success); }
-    .status-bar.err  { color: var(--danger); }
-    .status-bar.warn { color: var(--warn); }
-    .status-bar.busy { color: var(--accent); }
-
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
-  </style>
+/* ── status bar ── */
+.sbar{height:24px;padding:0 14px;display:flex;align-items:center;gap:6px;
+  font-size:11px;border-top:1px solid var(--border);flex-shrink:0}
+.sbar.hidden{display:none}
+.sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sbar.busy .sdot{background:var(--accent);animation:pulse .9s infinite}
+.sbar.ok   .sdot{background:var(--ok)}
+.sbar.warn .sdot{background:var(--miss)}
+.sbar.err  .sdot{background:var(--err)}
+.sbar.busy{color:var(--accent)}
+.sbar.ok  {color:var(--ok)}
+.sbar.warn{color:var(--miss)}
+.sbar.err {color:var(--err)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+</style>
 </head>
 <body>
 
-  <div class="header">
-    <h1>Relinker</h1>
-  </div>
+<div class="header">
+  <h1>Relinker</h1>
+</div>
 
-  <div class="sel-strip">
-    <div id="sel-dot" class="sel-dot"></div>
-    <div style="overflow:hidden; flex:1">
-      <div id="sel-name" class="sel-name" style="color:var(--muted)">Nothing selected</div>
-      <div id="sel-type" class="sel-type">Select a Frame or Component to start</div>
-    </div>
+<div class="sel">
+  <div id="dot" class="dot"></div>
+  <div style="overflow:hidden;flex:1">
+    <div id="sel-name" class="sel-name" style="color:var(--muted)">Nothing selected</div>
+    <div id="sel-type" class="sel-type">Select a frame or component</div>
   </div>
+</div>
 
-  <div class="body" id="body">
-    <!-- states injected by JS -->
-  </div>
+<div class="body" id="body">
+  <!-- idle / log rendered here -->
+</div>
 
-  <div class="footer">
-    <button id="btn-scan"   class="btn btn-ghost"   disabled>Scan</button>
-    <button id="btn-relink" class="btn btn-primary"  disabled>Relink</button>
-  </div>
+<div class="footer">
+  <button id="btn-relink" class="btn btn-primary" disabled>Relink</button>
+</div>
 
-  <div id="status-bar" class="status-bar hidden">
-    <div class="s-dot"></div>
-    <span id="status-text"></span>
-  </div>
+<div id="sbar" class="sbar hidden">
+  <div class="sdot"></div>
+  <span id="sbar-text"></span>
+</div>
 
 <script>
-// ─── state ───────────────────────────────────────────────
-let hasSelection = false;
-let lastScan     = null;   // ScanResult | null
-const MAX_ROWS   = 6;
+// ─── state ───────────────────────────────────
+let hasSel = false;
 
-// ─── DOM ─────────────────────────────────────────────────
-const selDot   = document.getElementById('sel-dot');
-const selName  = document.getElementById('sel-name');
-const selType  = document.getElementById('sel-type');
-const body     = document.getElementById('body');
-const btnScan  = document.getElementById('btn-scan');
-const btnRelink= document.getElementById('btn-relink');
-const statusBar= document.getElementById('status-bar');
-const statusTxt= document.getElementById('status-text');
+// ─── DOM ─────────────────────────────────────
+const dot       = document.getElementById('dot');
+const selName   = document.getElementById('sel-name');
+const selType   = document.getElementById('sel-type');
+const body      = document.getElementById('body');
+const btnRelink = document.getElementById('btn-relink');
+const sbar      = document.getElementById('sbar');
+const sbarText  = document.getElementById('sbar-text');
 
-// ─── status bar ──────────────────────────────────────────
-function setStatus(type, text) {
-  statusBar.className = 'status-bar ' + type;
-  statusTxt.textContent = text;
-}
-function clearStatus() { statusBar.className = 'status-bar hidden'; }
+// ─── status bar ──────────────────────────────
+function status(type, text){ sbar.className='sbar '+type; sbarText.textContent=text; }
+function clearStatus(){ sbar.className='sbar hidden'; }
 
-// ─── selection strip ─────────────────────────────────────
-function updateSel(info) {
-  hasSelection = info.hasSelection;
-  selDot.className = 'sel-dot' + (info.hasSelection ? ' active' : '');
-  if (info.hasSelection) {
+// ─── selection ───────────────────────────────
+function updateSel(info){
+  hasSel = info.hasSelection;
+  dot.className = 'dot'+(hasSel?' on':'');
+  if(hasSel){
     selName.textContent = info.name;
     selName.style.color = '';
     selType.textContent = info.nodeType;
   } else {
     selName.textContent = 'Nothing selected';
     selName.style.color = 'var(--muted)';
-    selType.textContent = 'Select a Frame or Component to start';
-    lastScan = null;
+    selType.textContent = 'Select a frame or component';
     showIdle();
   }
-  updateButtons();
+  btnRelink.disabled = !hasSel;
 }
 
-// ─── button states ────────────────────────────────────────
-function updateButtons() {
-  btnScan.disabled = !hasSelection;
-
-  if (!hasSelection || !lastScan) {
-    btnRelink.disabled = true;
-    btnRelink.textContent = 'Relink';
-    btnRelink.className = 'btn btn-primary';
-    return;
-  }
-
-  const matchCount =
-    lastScan.styles.filter(s => s.hasLocal).length +
-    lastScan.variables.filter(v => v.hasLocal).length +
-    lastScan.components.filter(c => c.hasLocal).length;
-
-  if (matchCount === 0) {
-    btnRelink.disabled = true;
-    btnRelink.textContent = 'Nothing to relink';
-    btnRelink.className = 'btn btn-ghost';
-  } else {
-    btnRelink.disabled = false;
-    btnRelink.textContent = `Relink ${matchCount} matched →`;
-    btnRelink.className = 'btn btn-success';
-  }
-}
-
-// ─── views ───────────────────────────────────────────────
-function setBody(html) { body.innerHTML = html; }
-
-function showIdle() {
-  setBody(`
-    <div class="state-center">
-      <div class="icon">⇄</div>
+// ─── idle state ───────────────────────────────
+function showIdle(){
+  body.innerHTML = `
+    <div class="idle">
+      <div class="ico">⇄</div>
       <div class="title">Relinker</div>
       <div class="desc">
-        Paste a frame from your donor library, select it,
-        then <strong>Scan</strong> to see all external dependencies.
-        The plugin will relink everything it can find locally
-        and clearly flag what's missing.
+        Select a frame pasted from a donor library,
+        then click <strong>Relink</strong>.<br><br>
+        The plugin walks every node in the tree —
+        including inside nested components — and relinks
+        all styles, variables and component instances
+        to local equivalents.
       </div>
-    </div>`);
+    </div>`;
 }
 
-function showScanPrompt() {
-  setBody(`
-    <div class="state-center">
-      <div class="icon">🔍</div>
-      <div class="title">Ready to scan</div>
-      <div class="desc">
-        Click <strong>Scan</strong> to analyse all styles, variables and
-        component dependencies in the selected frame.
-      </div>
-    </div>`);
-}
+// ─── escape ──────────────────────────────────
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-// ─── scan result view ────────────────────────────────────
-const BADGE_MAP = { PAINT:'paint', TEXT:'text', EFFECT:'effect', GRID:'grid', STYLE:'style' };
+// ─── render log ──────────────────────────────
+const MAX_PER_GROUP = 8;
 
-function badge(cls, label) {
-  return `<span class="badge b-${cls.toLowerCase()}">${label}</span>`;
-}
+function catLabel(cat){ return cat === 'style' ? 'STYLE' : cat === 'variable' ? 'VAR' : 'COMP'; }
+function catCls(cat)  { return 'cat-'+cat; }
 
-function renderRows(items, rowFn) {
-  let h = '<div class="row-list">';
-  items.forEach((item, i) => {
-    const hidden = i >= MAX_ROWS ? ' style="display:none"' : '';
-    h += `<div${hidden}>${rowFn(item)}</div>`;
-  });
-  h += '</div>';
-  if (items.length > MAX_ROWS) {
-    h += `<button class="show-more" data-extra="${items.length - MAX_ROWS}">
-            Show ${items.length - MAX_ROWS} more…
-          </button>`;
-  }
-  return h;
-}
+function renderLog(res){
+  const ok   = res.log.filter(e => e.status === 'ok');
+  const miss = res.log.filter(e => e.status === 'missing');
+  const err  = res.log.filter(e => e.status === 'error');
 
-function renderScan(scan) {
-  lastScan = scan;
+  const total  = res.stylesRelinked + res.variablesRelinked + res.componentsSwapped;
+  const errCnt = res.errors.length;
+  const missCnt= res.missing.length;
 
-  const total = scan.styles.length + scan.variables.length + scan.components.length;
-
-  if (total === 0) {
-    setBody(`
-      <div class="state-center">
-        <div class="icon" style="color:var(--success)">✓</div>
-        <div class="title" style="color:var(--success)">No external dependencies</div>
-        <div class="desc">All styles, variables and components are already local.</div>
-      </div>`);
-    updateButtons();
-    return;
-  }
-
-  // Split into matched (will relink) and missing (will skip)
-  const matched = {
-    styles:     scan.styles.filter(s => s.hasLocal),
-    variables:  scan.variables.filter(v => v.hasLocal),
-    components: scan.components.filter(c => c.hasLocal),
-  };
-  const missing = {
-    styles:     scan.styles.filter(s => !s.hasLocal),
-    variables:  scan.variables.filter(v => !v.hasLocal),
-    components: scan.components.filter(c => !c.hasLocal),
-  };
-
-  const matchCount  = matched.styles.length + matched.variables.length + matched.components.length;
-  const missCount   = missing.styles.length + missing.variables.length + missing.components.length;
+  // deduplicate missing/error log entries by name
+  const uniqMiss = dedup(miss);
+  const uniqErr  = dedup(err);
 
   let html = '';
 
-  // Top summary banner
-  if (matchCount > 0 && missCount > 0) {
-    html += `<div class="banner warn">
-      <strong>${matchCount} matched</strong> — will be relinked.<br>
-      <strong>${missCount} missing</strong> — not found locally, will be skipped.
-    </div>`;
-  } else if (matchCount > 0) {
-    html += `<div class="banner success">
-      <strong>${matchCount} dependencies matched</strong> — all will be relinked.
-    </div>`;
-  } else {
-    html += `<div class="banner danger">
-      <strong>Nothing matched locally.</strong> Create the missing components, styles and variables first.
-    </div>`;
-  }
-
-  // ── WILL RELINK section ──
-  if (matchCount > 0) {
-    html += '<hr>';
-    html += `<div class="section">
-      <div class="section-hdr">
-        Will relink
-        <span class="pill pill-ok">${matchCount}</span>
-      </div>`;
-
-    if (matched.styles.length) {
-      html += renderRows(matched.styles, s =>
-        `<div class="row ok-row">
-          ${badge(BADGE_MAP[s.styleType] || 'style', s.styleType)}
-          <span class="name" title="${esc(s.name)}">${esc(s.name)}</span>
-          <span class="si si-ok">✓</span>
-        </div>`);
-    }
-    if (matched.variables.length) {
-      html += renderRows(matched.variables, v =>
-        `<div class="row ok-row">
-          ${badge('var', 'VAR')}
-          <span class="name" title="${esc(v.key)}">${esc(v.key)}</span>
-          <span class="si si-ok">✓</span>
-        </div>`);
-    }
-    if (matched.components.length) {
-      html += renderRows(matched.components, c =>
-        `<div class="row ok-row">
-          ${badge('comp', 'COMP')}
-          <span class="name" title="${esc(c.name)}">${esc(c.name)}</span>
-          <span class="si si-ok">✓</span>
-        </div>`);
-    }
-
-    html += '</div>'; // section
-  }
-
-  // ── MISSING section ──
-  if (missCount > 0) {
-    html += '<hr>';
-    html += `<div class="section">
-      <div class="section-hdr">
-        Missing locally — will skip
-        <span class="pill pill-miss">${missCount}</span>
-      </div>
-      <div class="banner danger" style="font-size:10px;padding:6px 10px">
-        These don't exist in this file. Create them locally to complete relinking.
-      </div>`;
-
-    const allMiss = [
-      ...missing.styles.map(s    => ({ label: s.name,  cls: BADGE_MAP[s.styleType] || 'style', tag: s.styleType })),
-      ...missing.variables.map(v => ({ label: v.key,   cls: 'var',  tag: 'VAR' })),
-      ...missing.components.map(c=> ({ label: c.name,  cls: 'comp', tag: 'COMP' })),
-    ];
-    html += renderRows(allMiss, item =>
-      `<div class="row miss-row">
-        ${badge(item.cls, item.tag)}
-        <span class="name" title="${esc(item.label)}">${esc(item.label)}</span>
-        <span class="si si-miss">✗</span>
-      </div>`);
-
-    html += '</div>'; // section
-  }
-
-  setBody(html);
-  wireShowMore();
-  updateButtons();
-}
-
-// ─── relink result view ──────────────────────────────────
-function renderResult(res) {
-  const relinked = res.stylesRelinked + res.variablesRelinked + res.componentsSwapped;
-  const allMiss  = [...res.stylesMissing, ...res.variablesMissing, ...res.componentsMissing];
-  const errCount = (res.errors || []).length;
-
-  let html = '';
-
-  // Top outcome banner
-  if (relinked > 0 && allMiss.length === 0 && errCount === 0) {
-    html += `<div class="banner success">✓ All matched dependencies relinked successfully.</div>`;
-  } else if (relinked > 0) {
-    html += `<div class="banner info"><strong>${relinked} relinked.</strong>${
-      allMiss.length ? ` ${allMiss.length} still missing.` : ''
-    }${errCount ? ` ${errCount} error${errCount > 1 ? 's' : ''} skipped.` : ''}</div>`;
-  } else {
-    html += `<div class="banner warn">Nothing was relinked. Run Scan to see what's needed.</div>`;
-  }
-
-  // Stat cards
-  html += `<div class="stat-grid">
-    <div class="stat-card ${res.stylesRelinked > 0 ? 'c-ok' : ''}">
-      <div class="val">${res.stylesRelinked}</div>
-      <div class="lbl">Styles</div>
+  // ── summary bar ──
+  html += `<div class="summary">
+    <div class="stat ${total>0?'s-ok':'s-zero'}">
+      <div class="val">${total}</div><div class="lbl">Relinked</div>
     </div>
-    <div class="stat-card ${res.variablesRelinked > 0 ? 'c-ok' : ''}">
-      <div class="val">${res.variablesRelinked}</div>
-      <div class="lbl">Variables</div>
+    <div class="stat ${missCnt>0?'s-miss':'s-zero'}">
+      <div class="val">${missCnt}</div><div class="lbl">Missing</div>
     </div>
-    <div class="stat-card ${res.componentsSwapped > 0 ? 'c-ok' : ''}">
-      <div class="val">${res.componentsSwapped}</div>
-      <div class="lbl">Components</div>
+    <div class="stat ${errCnt>0?'s-err':'s-zero'}">
+      <div class="val">${errCnt}</div><div class="lbl">Errors</div>
     </div>
   </div>`;
 
-  // Still missing
-  if (allMiss.length > 0) {
-    html += `<hr>
-    <div class="section">
-      <div class="section-hdr">
-        Still missing locally
-        <span class="pill pill-miss">${allMiss.length}</span>
-      </div>`;
-    html += renderRows(allMiss, name =>
-      `<div class="row miss-row">
-        <span class="si si-miss">✗</span>
-        <span class="name" title="${esc(name)}">${esc(name)}</span>
-      </div>`);
-    html += '</div>';
+  html += '<div class="log" id="log">';
+
+  // ── relinked ──
+  if(ok.length){
+    html += group('✓ Relinked', ok.length, 'gc-ok', ok, MAX_PER_GROUP);
   }
 
-  // Errors
-  if (errCount > 0) {
-    html += `<hr>
-    <div class="section">
-      <div class="section-hdr">
-        Errors skipped
-        <span class="pill pill-warn">${errCount}</span>
-      </div>
-      <div class="banner warn" style="font-size:10px;padding:6px 10px">
-        These items were found locally but could not be applied. The rest was still relinked.
-      </div>`;
-    html += renderRows(res.errors, msg =>
-      `<div class="row">
-        <span class="si si-err">!</span>
-        <span class="name" title="${esc(msg)}">${esc(msg)}</span>
-      </div>`);
-    html += '</div>';
+  // ── missing ──
+  if(uniqMiss.length){
+    html += group('✗ Missing locally — skipped', uniqMiss.length, 'gc-miss', uniqMiss, MAX_PER_GROUP);
   }
 
-  setBody(html);
-  wireShowMore();
+  // ── errors ──
+  if(uniqErr.length){
+    html += group('! Errors — skipped', uniqErr.length, 'gc-err', uniqErr, MAX_PER_GROUP);
+  }
 
-  // Keep lastScan so Relink button stays armed
-  updateButtons();
-}
+  if(!ok.length && !uniqMiss.length && !uniqErr.length){
+    html += `<div style="padding:24px 14px;text-align:center;color:var(--muted);font-size:11px">
+      Nothing to relink — no external dependencies found.
+    </div>`;
+  }
 
-// ─── show-more wiring ────────────────────────────────────
-function wireShowMore() {
+  html += '</div>'; // .log
+
+  body.innerHTML = html;
+
+  // wire show-more
   body.querySelectorAll('.show-more').forEach(btn => {
-    btn.addEventListener('click', () => {
-      btn.previousElementSibling.querySelectorAll('[style*="display:none"]')
-         .forEach(r => r.style.display = '');
-      btn.remove();
+    btn.addEventListener('click', ()=>{
+      btn.closest('.log-group').querySelectorAll('[data-hidden]').forEach(r=>{
+        r.style.display=''; r.removeAttribute('data-hidden');
+      });
+      btn.closest('.show-more-row').remove();
     });
   });
 }
 
-// ─── escape ──────────────────────────────────────────────
-function esc(s) {
-  return String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function dedup(entries){
+  const seen = new Set();
+  return entries.filter(e=>{ if(seen.has(e.name)) return false; seen.add(e.name); return true; });
 }
 
-// ─── button handlers ─────────────────────────────────────
-btnScan.addEventListener('click', () => {
-  setStatus('busy', 'Scanning…');
-  btnScan.disabled = true;
-  parent.postMessage({ pluginMessage: { type: 'scan-selection' } }, '*');
-});
+function group(title, count, pillCls, entries, max){
+  let h = `<div class="log-group">
+    <div class="log-group-hdr">
+      ${esc(title)}
+      <span class="group-count ${pillCls}">${count}</span>
+    </div>`;
 
-btnRelink.addEventListener('click', () => {
-  setStatus('busy', 'Relinking — continuing past errors…');
+  const iconMap = { ok:'<span class="icon icon-ok">✓</span>', missing:'<span class="icon icon-miss">✗</span>', error:'<span class="icon icon-err">!</span>' };
+
+  entries.forEach((e,i)=>{
+    const hidden = i >= max;
+    h += `<div class="log-row"${hidden?' style="display:none" data-hidden':''}>
+      ${iconMap[e.status]||''}
+      <span class="cat ${catCls(e.category)}">${catLabel(e.category)}</span>
+      <span class="name" title="${esc(e.name)}">${esc(e.name)}</span>
+    </div>`;
+  });
+
+  if(entries.length > max){
+    h += `<div class="show-more-row">
+      <button class="show-more">Show ${entries.length-max} more…</button>
+    </div>`;
+  }
+
+  h += '</div>';
+  return h;
+}
+
+// ─── buttons ─────────────────────────────────
+btnRelink.addEventListener('click', ()=>{
+  status('busy','Relinking — walking full tree…');
   btnRelink.disabled = true;
-  parent.postMessage({ pluginMessage: { type: 'relink-selection' } }, '*');
+  parent.postMessage({pluginMessage:{type:'relink-selection'}},'*');
 });
 
-// ─── plugin messages ─────────────────────────────────────
+// ─── messages ────────────────────────────────
 window.onmessage = e => {
   const msg = e.data.pluginMessage;
-  if (!msg) return;
-
-  switch (msg.type) {
+  if(!msg) return;
+  switch(msg.type){
     case 'selection-info':
       updateSel(msg);
-      clearStatus();
-      if (msg.hasSelection && !lastScan) showScanPrompt();
-      break;
-
-    case 'scan-result':
-      renderScan(msg.result);
-      btnScan.disabled = false;
       clearStatus();
       break;
 
     case 'relink-result': {
-      renderResult(msg.result);
-      btnScan.disabled = !hasSelection;
-      const n = msg.result.stylesRelinked + msg.result.variablesRelinked + msg.result.componentsSwapped;
-      const e = (msg.result.errors || []).length;
-      if (e > 0) {
-        setStatus('warn', `${n} relinked, ${e} error${e>1?'s':''} skipped`);
-      } else {
-        setStatus('ok', `${n} ${n === 1 ? 'dependency' : 'dependencies'} relinked`);
-      }
+      const r = msg.result;
+      renderLog(r);
+      btnRelink.disabled = !hasSel;
+      const total = r.stylesRelinked + r.variablesRelinked + r.componentsSwapped;
+      const ec = r.errors.length, mc = r.missing.length;
+      if(ec>0)       status('warn', `${total} relinked · ${ec} error${ec>1?'s':''} skipped · ${mc} missing`);
+      else if(mc>0)  status('ok',   `${total} relinked · ${mc} missing locally`);
+      else if(total) status('ok',   `${total} ${total===1?'dependency':'dependencies'} relinked`);
+      else           clearStatus();
       break;
     }
 
     case 'error':
-      setStatus('err', msg.message);
-      btnScan.disabled   = !hasSelection;
-      btnRelink.disabled = !hasSelection || !lastScan;
+      status('err', msg.message);
+      btnRelink.disabled = !hasSel;
       break;
   }
 };
 
-// ─── boot ────────────────────────────────────────────────
+// ─── boot ────────────────────────────────────
 showIdle();
-parent.postMessage({ pluginMessage: { type: 'get-selection-info' } }, '*');
+parent.postMessage({pluginMessage:{type:'get-selection-info'}},'*');
 </script>
 </body>
 </html>
