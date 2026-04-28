@@ -1,46 +1,51 @@
 "use strict";
 (() => {
   // src/relinker.ts
-  function buildLocalMaps() {
+  function buildMaps() {
     var _a, _b;
-    const styles = /* @__PURE__ */ new Map();
-    const styleTypeById = /* @__PURE__ */ new Map();
+    const paintStyles = /* @__PURE__ */ new Map();
+    const textStyles = /* @__PURE__ */ new Map();
+    const effectStyles = /* @__PURE__ */ new Map();
+    const gridStyles = /* @__PURE__ */ new Map();
     const localStyleIds = /* @__PURE__ */ new Set();
-    const allStyles = [
-      ...figma.getLocalPaintStyles().map((s) => ({ s, t: "PAINT" })),
-      ...figma.getLocalTextStyles().map((s) => ({ s, t: "TEXT" })),
-      ...figma.getLocalEffectStyles().map((s) => ({ s, t: "EFFECT" })),
-      ...figma.getLocalGridStyles().map((s) => ({ s, t: "GRID" }))
-    ];
-    for (const { s, t } of allStyles) {
-      styles.set(s.name, s.id);
-      styleTypeById.set(s.id, t);
+    for (const s of figma.getLocalPaintStyles()) {
+      paintStyles.set(s.name, s.id);
+      localStyleIds.add(s.id);
+    }
+    for (const s of figma.getLocalTextStyles()) {
+      textStyles.set(s.name, s.id);
+      localStyleIds.add(s.id);
+    }
+    for (const s of figma.getLocalEffectStyles()) {
+      effectStyles.set(s.name, s.id);
+      localStyleIds.add(s.id);
+    }
+    for (const s of figma.getLocalGridStyles()) {
+      gridStyles.set(s.name, s.id);
       localStyleIds.add(s.id);
     }
     const variables = /* @__PURE__ */ new Map();
     const localVarIds = /* @__PURE__ */ new Set();
     try {
-      const colNameCache = /* @__PURE__ */ new Map();
+      const colCache = /* @__PURE__ */ new Map();
       for (const v of figma.variables.getLocalVariables()) {
-        let colName = colNameCache.get(v.variableCollectionId);
-        if (colName === void 0) {
-          colName = (_b = (_a = figma.variables.getVariableCollectionById(v.variableCollectionId)) == null ? void 0 : _a.name) != null ? _b : "";
-          colNameCache.set(v.variableCollectionId, colName);
+        let col = colCache.get(v.variableCollectionId);
+        if (col === void 0) {
+          col = (_b = (_a = figma.variables.getVariableCollectionById(v.variableCollectionId)) == null ? void 0 : _a.name) != null ? _b : "";
+          colCache.set(v.variableCollectionId, col);
         }
-        variables.set(`${colName}/${v.name}`, v);
+        variables.set(`${col}/${v.name}`, v);
         localVarIds.add(v.id);
       }
     } catch (e) {
     }
-    const componentCache = /* @__PURE__ */ new Map();
-    return { styles, styleTypeById, localStyleIds, variables, localVarIds, componentCache };
+    return { paintStyles, textStyles, effectStyles, gridStyles, localStyleIds, variables, localVarIds, compCache: /* @__PURE__ */ new Map() };
   }
-  function compSetName(comp) {
+  function getSetName(main, inst) {
     var _a;
-    return ((_a = comp.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? comp.parent.name : null;
-  }
-  function compCacheKey(variantName, setName) {
-    return setName ? `${setName}/${variantName}` : variantName;
+    if (((_a = main.parent) == null ? void 0 : _a.type) === "COMPONENT_SET")
+      return main.parent.name;
+    return inst.name || null;
   }
   function getVariantProps(inst) {
     try {
@@ -48,106 +53,66 @@
       if (!cp)
         return {};
       const out = {};
-      for (const [k, p] of Object.entries(cp)) {
+      for (const [k, p] of Object.entries(cp))
         if (p.type === "VARIANT" && typeof p.value === "string")
           out[k] = p.value;
-      }
       return out;
     } catch (e) {
       return {};
     }
   }
-  function findLocalComponent(variantName, setName, cache, variantProps) {
-    const key = compCacheKey(variantName, setName);
-    if (cache.has(key))
-      return cache.get(key);
+  function findLocalVariant(setName, variantProps, cache) {
+    const cacheKey = `${setName}\0${JSON.stringify(Object.entries(variantProps).sort())}`;
+    if (cache.has(cacheKey))
+      return cache.get(cacheKey);
+    const hasProps = Object.keys(variantProps).length > 0;
     let found = null;
     const pages = [figma.currentPage, ...figma.root.children.filter((p) => p !== figma.currentPage)];
-    const hasFallbackProps = variantProps && Object.keys(variantProps).length > 0;
-    for (const page of pages) {
-      if (setName) {
-        found = page.findOne(
-          (n) => {
-            var _a;
-            return n.type === "COMPONENT" && n.name === variantName && ((_a = n.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" && n.parent.name === setName;
-          }
-        );
-        if (!found && hasFallbackProps) {
-          found = page.findOne((n) => {
-            var _a;
-            if (n.type !== "COMPONENT")
-              return false;
-            if (((_a = n.parent) == null ? void 0 : _a.type) !== "COMPONENT_SET")
-              return false;
-            if (n.parent.name !== setName)
-              return false;
-            const vp = n.variantProperties;
-            if (!vp)
-              return false;
-            return Object.entries(variantProps).every(([k, v]) => vp[k] === v);
-          });
+    outer:
+      for (const page of pages) {
+        const result = page.findOne((n) => {
+          var _a;
+          if (n.type !== "COMPONENT")
+            return false;
+          if (((_a = n.parent) == null ? void 0 : _a.type) !== "COMPONENT_SET")
+            return false;
+          if (n.parent.name !== setName)
+            return false;
+          if (!hasProps)
+            return true;
+          const vp = n.variantProperties;
+          if (!vp)
+            return false;
+          return Object.entries(variantProps).every(([k, v]) => vp[k] === v);
+        });
+        if (result) {
+          found = result;
+          break outer;
         }
-      } else {
-        found = page.findOne(
-          (n) => {
-            var _a;
-            return n.type === "COMPONENT" && n.name === variantName && ((_a = n.parent) == null ? void 0 : _a.type) !== "COMPONENT_SET";
-          }
-        );
       }
-      if (found)
-        break;
-    }
-    cache.set(key, found);
+    cache.set(cacheKey, found);
     return found;
   }
-  function cleanName(name) {
-    return name.replace(/[\u2000-\u2BFF\uE000-\uF8FF\uFFF0-\uFFFF]/g, "").replace(/^[^\w]+/, "").replace(/\s{2,}/g, " ").trim();
-  }
-  function cleanSegment(s) {
-    return s.replace(/^[^\w]+/, "").trim();
-  }
-  function parseRemoteName(rawName, instName) {
-    var _a, _b, _c, _d;
-    if (!rawName.includes("/")) {
-      return { variantName: cleanSegment(rawName), setName: null };
-    }
-    const parts = rawName.split("/").map(cleanSegment).filter(Boolean);
-    const start = ((_a = parts[0]) == null ? void 0 : _a.toLowerCase()) === "component" ? 1 : 0;
-    const setFromPath = (_b = parts[start]) != null ? _b : null;
-    const variantFromPath = (_c = parts[start + 1]) != null ? _c : null;
-    const variantName = (_d = variantFromPath != null ? variantFromPath : setFromPath) != null ? _d : cleanSegment(rawName);
-    const setName = setFromPath != null ? setFromPath : instName !== rawName ? cleanSegment(instName) : null;
-    return { variantName, setName };
-  }
-  function getStyleName(styleId) {
-    var _a, _b;
+  var STYLE_FIELDS = [
+    { field: "fillStyleId", getMap: (m) => m.paintStyles },
+    { field: "strokeStyleId", getMap: (m) => m.paintStyles },
+    { field: "effectStyleId", getMap: (m) => m.effectStyles },
+    { field: "textStyleId", getMap: (m) => m.textStyles },
+    { field: "gridStyleId", getMap: (m) => m.gridStyles }
+  ];
+  function resolveVar(alias) {
     try {
-      return (_b = (_a = figma.getStyleById(styleId)) == null ? void 0 : _a.name) != null ? _b : null;
+      return figma.variables.getVariableById(alias.id);
     } catch (e) {
       return null;
     }
   }
-  var STYLE_FIELDS = [
-    "fillStyleId",
-    "strokeStyleId",
-    "effectStyleId",
-    "textStyleId",
-    "gridStyleId"
-  ];
-  function getVarKey(v) {
+  function varKey(v) {
     try {
       const col = figma.variables.getVariableCollectionById(v.variableCollectionId);
       return col ? `${col.name}/${v.name}` : v.name;
     } catch (e) {
       return v.name;
-    }
-  }
-  function resolveAlias(alias) {
-    try {
-      return figma.variables.getVariableById(alias.id);
-    } catch (e) {
-      return null;
     }
   }
   var SCALAR_VAR_FIELDS = [
@@ -170,42 +135,42 @@
     "counterAxisSpacing"
   ];
   var PAINT_VAR_FIELDS = ["color", "opacity", "visible"];
-  function scanNode(node, maps, styles, variables, components, counter) {
-    var _a, _b;
+  function compDisplayName(setName, variantProps, fallback) {
+    const varStr = Object.keys(variantProps).length > 0 ? Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(", ") : fallback;
+    return `${setName} / ${varStr}`;
+  }
+  function scanNode(node, maps, out, counter) {
+    var _a;
     counter.n++;
-    for (const field of STYLE_FIELDS) {
+    for (const { field, getMap } of STYLE_FIELDS) {
       if (!(field in node))
         continue;
       const rawId = node[field];
       if (!rawId || rawId === figma.mixed)
         continue;
       const id = rawId;
-      if (maps.localStyleIds.has(id) || styles.has(id))
+      if (maps.localStyleIds.has(id) || out.styles.has(id))
         continue;
-      const name = getStyleName(id);
-      if (!name)
+      const style = figma.getStyleById(id);
+      if (!style)
         continue;
-      styles.set(id, {
-        name,
-        styleType: (_a = maps.styleTypeById.get(id)) != null ? _a : "STYLE",
-        hasLocal: maps.styles.has(name)
-      });
+      out.styles.set(id, { name: style.name, styleType: style.type, hasLocal: getMap(maps).has(style.name) });
     }
     if ("boundVariables" in node) {
       const bv = node.boundVariables;
       if (bv) {
-        for (const field of SCALAR_VAR_FIELDS) {
-          const alias = bv[field];
-          if (!alias || !("id" in alias))
+        for (const f of SCALAR_VAR_FIELDS) {
+          const alias = bv[f];
+          if (!(alias == null ? void 0 : alias.id))
             continue;
           if (maps.localVarIds.has(alias.id))
             continue;
-          const v = resolveAlias(alias);
+          const v = resolveVar(alias);
           if (!v)
             continue;
-          const key = getVarKey(v);
-          if (!variables.has(key))
-            variables.set(key, { key, hasLocal: maps.variables.has(key) });
+          const key = varKey(v);
+          if (!out.vars.has(key))
+            out.vars.set(key, { key, hasLocal: maps.variables.has(key) });
         }
       }
     }
@@ -222,14 +187,15 @@
           const alias = paint.boundVariables[pf];
           if (!alias || Array.isArray(alias))
             continue;
-          if (maps.localVarIds.has(alias.id))
+          const a = alias;
+          if (maps.localVarIds.has(a.id))
             continue;
-          const v = resolveAlias(alias);
+          const v = resolveVar(a);
           if (!v)
             continue;
-          const key = getVarKey(v);
-          if (!variables.has(key))
-            variables.set(key, { key, hasLocal: maps.variables.has(key) });
+          const key = varKey(v);
+          if (!out.vars.has(key))
+            out.vars.set(key, { key, hasLocal: maps.variables.has(key) });
         }
       }
     }
@@ -237,50 +203,50 @@
       const inst = node;
       const main = inst.mainComponent;
       if (main) {
-        const accessible = compSetName(main);
-        const isRemote = !accessible;
-        const { variantName, setName: parsedSet } = accessible ? { variantName: cleanName(main.name), setName: cleanName(accessible) } : parseRemoteName(main.name, inst.name);
-        const variantProps = isRemote ? getVariantProps(inst) : void 0;
-        const cacheKey = compCacheKey(variantName, parsedSet);
-        if (!components.has(cacheKey)) {
-          const localComp = findLocalComponent(variantName, parsedSet, maps.componentCache, variantProps);
-          const needsSwap = localComp !== null && localComp.key !== main.key;
-          if (localComp === null || needsSwap) {
-            const resolvedVariant = (_b = localComp == null ? void 0 : localComp.name) != null ? _b : variantProps && Object.keys(variantProps).length > 0 ? Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(", ") : variantName;
-            const displayName = parsedSet ? `${parsedSet} / ${resolvedVariant}` : resolvedVariant;
-            components.set(cacheKey, { name: displayName, hasLocal: localComp !== null });
+        const setName = getSetName(main, inst);
+        if (setName) {
+          const variantProps = getVariantProps(inst);
+          const cacheKey = `${setName}\0${JSON.stringify(Object.entries(variantProps).sort())}`;
+          if (!out.comps.has(cacheKey)) {
+            const local = findLocalVariant(setName, variantProps, maps.compCache);
+            const needsSwap = local !== null && local.key !== main.key;
+            if (local === null || needsSwap) {
+              const display = compDisplayName(setName, variantProps, (_a = local == null ? void 0 : local.name) != null ? _a : main.name);
+              out.comps.set(cacheKey, { name: display, hasLocal: local !== null });
+            }
           }
         }
       }
       return;
     }
     if ("children" in node) {
-      for (const child of node.children) {
-        scanNode(child, maps, styles, variables, components, counter);
-      }
+      for (const child of node.children)
+        scanNode(child, maps, out, counter);
     }
   }
   function scanSelection() {
     const sel = figma.currentPage.selection;
     if (sel.length === 0)
       throw new Error("Select a frame or component first.");
-    const maps = buildLocalMaps();
-    const stylesMap = /* @__PURE__ */ new Map();
-    const variablesMap = /* @__PURE__ */ new Map();
-    const componentsMap = /* @__PURE__ */ new Map();
+    const maps = buildMaps();
+    const out = {
+      styles: /* @__PURE__ */ new Map(),
+      vars: /* @__PURE__ */ new Map(),
+      comps: /* @__PURE__ */ new Map()
+    };
     const counter = { n: 0 };
-    for (const node of sel) {
-      scanNode(node, maps, stylesMap, variablesMap, componentsMap, counter);
-    }
+    for (const node of sel)
+      scanNode(node, maps, out, counter);
     return {
-      styles: Array.from(stylesMap.values()),
-      variables: Array.from(variablesMap.values()),
-      components: Array.from(componentsMap.values()),
+      styles: [...out.styles.values()],
+      variables: [...out.vars.values()],
+      components: [...out.comps.values()],
       nodesScanned: counter.n
     };
   }
-  function relinkStyles(node, maps, result) {
-    for (const field of STYLE_FIELDS) {
+  function relinkNode(node, maps, result) {
+    result.nodesProcessed++;
+    for (const { field, getMap } of STYLE_FIELDS) {
       if (!(field in node))
         continue;
       const rawId = node[field];
@@ -289,119 +255,112 @@
       const id = rawId;
       if (maps.localStyleIds.has(id))
         continue;
-      const name = getStyleName(id);
-      if (!name)
+      const style = figma.getStyleById(id);
+      if (!style)
         continue;
-      const localId = maps.styles.get(name);
+      const localId = getMap(maps).get(style.name);
       if (localId) {
         node[field] = localId;
         result.stylesRelinked++;
-      } else if (!result.stylesMissing.includes(name)) {
-        result.stylesMissing.push(name);
+      } else if (!result.stylesMissing.includes(style.name)) {
+        result.stylesMissing.push(style.name);
       }
     }
-  }
-  function relinkScalarVars(node, maps, result) {
-    if (!("boundVariables" in node))
-      return;
-    const bv = node.boundVariables;
-    if (!bv)
-      return;
-    for (const field of SCALAR_VAR_FIELDS) {
-      const alias = bv[field];
-      if (!alias || !("id" in alias))
-        continue;
-      if (maps.localVarIds.has(alias.id))
-        continue;
-      const donorVar = resolveAlias(alias);
-      if (!donorVar)
-        continue;
-      const key = getVarKey(donorVar);
-      const localVar = maps.variables.get(key);
-      if (localVar) {
-        try {
-          node.setBoundVariable(field, localVar);
-          result.variablesRelinked++;
-        } catch (e) {
-        }
-      } else if (!result.variablesMissing.includes(key)) {
-        result.variablesMissing.push(key);
-      }
-    }
-  }
-  function relinkPaintVars(paints, maps, result) {
-    return paints.map((paint) => {
-      if (!paint.boundVariables)
-        return paint;
-      let updated = paint;
-      for (const pf of PAINT_VAR_FIELDS) {
-        const alias = paint.boundVariables[pf];
-        if (!alias || Array.isArray(alias))
-          continue;
-        const a = alias;
-        if (maps.localVarIds.has(a.id))
-          continue;
-        const donorVar = resolveAlias(a);
-        if (!donorVar)
-          continue;
-        const key = getVarKey(donorVar);
-        const localVar = maps.variables.get(key);
-        if (localVar) {
-          try {
-            updated = figma.variables.setBoundVariableForPaint(updated, pf, localVar);
-            result.variablesRelinked++;
-          } catch (e) {
+    if ("boundVariables" in node) {
+      const bv = node.boundVariables;
+      if (bv) {
+        for (const f of SCALAR_VAR_FIELDS) {
+          const alias = bv[f];
+          if (!(alias == null ? void 0 : alias.id))
+            continue;
+          if (maps.localVarIds.has(alias.id))
+            continue;
+          const v = resolveVar(alias);
+          if (!v)
+            continue;
+          const key = varKey(v);
+          const localVar = maps.variables.get(key);
+          if (localVar) {
+            try {
+              node.setBoundVariable(f, localVar);
+              result.variablesRelinked++;
+            } catch (e) {
+            }
+          } else if (!result.variablesMissing.includes(key)) {
+            result.variablesMissing.push(key);
           }
-        } else if (!result.variablesMissing.includes(key)) {
-          result.variablesMissing.push(key);
         }
       }
-      return updated;
-    });
-  }
-  function relinkNode(node, maps, result) {
-    result.nodesProcessed++;
-    relinkStyles(node, maps, result);
-    relinkScalarVars(node, maps, result);
-    if ("fills" in node && node.fills !== figma.mixed) {
-      node.fills = relinkPaintVars(node.fills, maps, result);
     }
-    if ("strokes" in node) {
-      node.strokes = relinkPaintVars(node.strokes, maps, result);
+    for (const prop of ["fills", "strokes"]) {
+      if (!(prop in node))
+        continue;
+      const paints = node[prop];
+      if (!paints || paints === figma.mixed)
+        continue;
+      let dirty = false;
+      const newPaints = paints.map((paint) => {
+        if (!paint.boundVariables)
+          return paint;
+        let p = paint;
+        for (const pf of PAINT_VAR_FIELDS) {
+          const alias = paint.boundVariables[pf];
+          if (!alias || Array.isArray(alias))
+            continue;
+          const a = alias;
+          if (maps.localVarIds.has(a.id))
+            continue;
+          const v = resolveVar(a);
+          if (!v)
+            continue;
+          const key = varKey(v);
+          const localVar = maps.variables.get(key);
+          if (localVar) {
+            try {
+              p = figma.variables.setBoundVariableForPaint(p, pf, localVar);
+              result.variablesRelinked++;
+              dirty = true;
+            } catch (e) {
+            }
+          } else if (!result.variablesMissing.includes(key)) {
+            result.variablesMissing.push(key);
+          }
+        }
+        return p;
+      });
+      if (dirty)
+        node[prop] = newPaints;
     }
     if (node.type === "INSTANCE") {
       const inst = node;
       const main = inst.mainComponent;
       if (main) {
-        const accessible = compSetName(main);
-        const isRemote = !accessible;
-        const { variantName, setName } = accessible ? { variantName: cleanName(main.name), setName: cleanName(accessible) } : parseRemoteName(main.name, inst.name);
-        const variantProps = isRemote ? getVariantProps(inst) : void 0;
-        const localComp = findLocalComponent(variantName, setName, maps.componentCache, variantProps);
-        if (localComp && localComp.key !== main.key) {
-          inst.swapComponent(localComp);
-          result.componentsSwapped++;
-        } else if (!localComp) {
-          const resolvedVariant = variantProps && Object.keys(variantProps).length > 0 ? Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(", ") : variantName;
-          const displayName = setName ? `${setName} / ${resolvedVariant}` : resolvedVariant;
-          if (!result.componentsMissing.includes(displayName)) {
-            result.componentsMissing.push(displayName);
+        const setName = getSetName(main, inst);
+        if (setName) {
+          const variantProps = getVariantProps(inst);
+          const local = findLocalVariant(setName, variantProps, maps.compCache);
+          if (local && local.key !== main.key) {
+            inst.swapComponent(local);
+            result.componentsSwapped++;
+          } else if (!local) {
+            const display = compDisplayName(setName, variantProps, main.name);
+            if (!result.componentsMissing.includes(display))
+              result.componentsMissing.push(display);
           }
         }
       }
       return;
     }
     if ("children" in node) {
-      for (const child of node.children) {
+      for (const child of node.children)
         relinkNode(child, maps, result);
-      }
     }
   }
   function relinkSelection() {
     const sel = figma.currentPage.selection;
     if (sel.length === 0)
       throw new Error("Select a frame or component first.");
-    const maps = buildLocalMaps();
+    const maps = buildMaps();
     const result = {
       stylesRelinked: 0,
       stylesMissing: [],
