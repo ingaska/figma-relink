@@ -146,38 +146,47 @@ function findLocalComponent(
 // ---------------------------------------------------------------------------
 
 /**
- * Strip Figma layer-type icon characters from component names.
- * Uses a broad Unicode range (symbol blocks + private-use area) so it works
- * regardless of the exact codepoints Figma uses internally for ❖/◆/etc.
+ * Strip Figma layer-type icon characters from a name.
+ * Uses a broad Unicode range as primary sweep, then strips any remaining
+ * leading non-word characters so we don't depend on exact codepoints.
  */
 function cleanName(name: string): string {
   return name
-    .replace(/[\u2000-\u27FF\uE000-\uF8FF]/g, '') // symbol blocks & PUA
+    .replace(/[\u2000-\u2BFF\uE000-\uF8FF\uFFF0-\uFFFF]/g, '') // broad symbol/PUA blocks
+    .replace(/^[^\w]+/, '')   // strip any remaining leading non-word chars (icons the range missed)
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
 /**
+ * Strip leading icon/symbol characters from a single path segment.
+ * Works regardless of which specific Unicode codepoint Figma uses for the icon,
+ * because it removes everything before the first ASCII word character.
+ */
+function cleanSegment(s: string): string {
+  return s.replace(/^[^\w]+/, '').trim();
+}
+
+/**
  * Remote library components sometimes return `mainComponent.name` as a full
  * hierarchical path like "component/❖ Footer/◆ mobile/paddingTop??".
- * Parse by position: skip the "component" prefix at index 0, take index 1 as
- * set name and index 2 as variant name (after cleaning icon characters).
+ * Parse by position using cleanSegment (codepoint-agnostic stripping):
+ * skip the "component" prefix, take index+1 as set name, index+2 as variant name.
  */
 function parseRemoteName(
   rawName: string,
   instName: string,
 ): { variantName: string; setName: string | null } {
   if (!rawName.includes('/')) {
-    return { variantName: cleanName(rawName), setName: null };
+    return { variantName: cleanSegment(rawName), setName: null };
   }
-  const parts = rawName.split('/').map(cleanName).filter(Boolean);
+  const parts = rawName.split('/').map(cleanSegment).filter(Boolean);
   // Skip generic "component" prefix if present
   const start = parts[0]?.toLowerCase() === 'component' ? 1 : 0;
   const setFromPath = parts[start] ?? null;
   const variantFromPath = parts[start + 1] ?? null;
-  // Prefer the explicit path segments; fall back to inst name for set
-  const variantName = variantFromPath ?? setFromPath ?? cleanName(rawName);
-  const setName = setFromPath ?? (instName !== rawName ? cleanName(instName) : null);
+  const variantName = variantFromPath ?? setFromPath ?? cleanSegment(rawName);
+  const setName = setFromPath ?? (instName !== rawName ? cleanSegment(instName) : null);
   return { variantName, setName };
 }
 

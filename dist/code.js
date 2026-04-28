@@ -102,19 +102,22 @@
     return found;
   }
   function cleanName(name) {
-    return name.replace(/[\u2000-\u27FF\uE000-\uF8FF]/g, "").replace(/\s{2,}/g, " ").trim();
+    return name.replace(/[\u2000-\u2BFF\uE000-\uF8FF\uFFF0-\uFFFF]/g, "").replace(/^[^\w]+/, "").replace(/\s{2,}/g, " ").trim();
+  }
+  function cleanSegment(s) {
+    return s.replace(/^[^\w]+/, "").trim();
   }
   function parseRemoteName(rawName, instName) {
     var _a, _b, _c, _d;
     if (!rawName.includes("/")) {
-      return { variantName: cleanName(rawName), setName: null };
+      return { variantName: cleanSegment(rawName), setName: null };
     }
-    const parts = rawName.split("/").map(cleanName).filter(Boolean);
+    const parts = rawName.split("/").map(cleanSegment).filter(Boolean);
     const start = ((_a = parts[0]) == null ? void 0 : _a.toLowerCase()) === "component" ? 1 : 0;
     const setFromPath = (_b = parts[start]) != null ? _b : null;
     const variantFromPath = (_c = parts[start + 1]) != null ? _c : null;
-    const variantName = (_d = variantFromPath != null ? variantFromPath : setFromPath) != null ? _d : cleanName(rawName);
-    const setName = setFromPath != null ? setFromPath : instName !== rawName ? cleanName(instName) : null;
+    const variantName = (_d = variantFromPath != null ? variantFromPath : setFromPath) != null ? _d : cleanSegment(rawName);
+    const setName = setFromPath != null ? setFromPath : instName !== rawName ? cleanSegment(instName) : null;
     return { variantName, setName };
   }
   function getStyleName(styleId) {
