@@ -1,5 +1,49 @@
 "use strict";
 (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
+  var __esm = (fn, res) => function __init() {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  };
+  var __commonJS = (cb, mod) => function __require() {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  };
+  var __async = (__this, __arguments, generator) => {
+    return new Promise((resolve, reject) => {
+      var fulfilled = (value) => {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      };
+      var rejected = (value) => {
+        try {
+          step(generator.throw(value));
+        } catch (e) {
+          reject(e);
+        }
+      };
+      var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+      step((generator = generator.apply(__this, __arguments)).next());
+    });
+  };
+
   // src/relinker.ts
   function buildMaps() {
     var _a, _b;
@@ -39,16 +83,7 @@
       }
     } catch (e) {
     }
-    return {
-      paintStyles,
-      textStyles,
-      effectStyles,
-      gridStyles,
-      localStyleIds,
-      variables,
-      localVarIds,
-      compCache: /* @__PURE__ */ new Map()
-    };
+    return { paintStyles, textStyles, effectStyles, gridStyles, localStyleIds, variables, localVarIds, compCache: /* @__PURE__ */ new Map() };
   }
   function getSetName(main, inst) {
     var _a;
@@ -71,15 +106,15 @@
     }
   }
   function findLocalVariant(setName, variantProps, cache) {
-    const cacheKey = `${setName}\0${JSON.stringify(Object.entries(variantProps).sort())}`;
-    if (cache.has(cacheKey))
-      return cache.get(cacheKey);
+    const key = `${setName}\0${JSON.stringify(Object.entries(variantProps).sort())}`;
+    if (cache.has(key))
+      return cache.get(key);
     const hasProps = Object.keys(variantProps).length > 0;
     let found = null;
     const pages = [figma.currentPage, ...figma.root.children.filter((p) => p !== figma.currentPage)];
     outer:
       for (const page of pages) {
-        const result = page.findOne((n) => {
+        const r = page.findOne((n) => {
           var _a;
           if (n.type !== "COMPONENT")
             return false;
@@ -94,21 +129,14 @@
             return false;
           return Object.entries(variantProps).every(([k, v]) => vp[k] === v);
         });
-        if (result) {
-          found = result;
+        if (r) {
+          found = r;
           break outer;
         }
       }
-    cache.set(cacheKey, found);
+    cache.set(key, found);
     return found;
   }
-  var STYLE_FIELDS = [
-    { field: "fillStyleId", getMap: (m) => m.paintStyles },
-    { field: "strokeStyleId", getMap: (m) => m.paintStyles },
-    { field: "effectStyleId", getMap: (m) => m.effectStyles },
-    { field: "textStyleId", getMap: (m) => m.textStyles },
-    { field: "gridStyleId", getMap: (m) => m.gridStyles }
-  ];
   function resolveVar(alias) {
     try {
       return figma.variables.getVariableById(alias.id);
@@ -124,31 +152,9 @@
       return v.name;
     }
   }
-  var SCALAR_VAR_FIELDS = [
-    "opacity",
-    "cornerRadius",
-    "topLeftRadius",
-    "topRightRadius",
-    "bottomLeftRadius",
-    "bottomRightRadius",
-    "itemSpacing",
-    "paddingTop",
-    "paddingBottom",
-    "paddingLeft",
-    "paddingRight",
-    "strokeWeight",
-    "minWidth",
-    "maxWidth",
-    "minHeight",
-    "maxHeight",
-    "counterAxisSpacing"
-  ];
-  var PAINT_VAR_FIELDS = ["color", "opacity", "visible"];
-  function push(result, entry) {
-    result.log.push(entry);
-  }
-  function relinkNode(node, maps, result) {
-    result.nodesProcessed++;
+  function processNode(node, maps, stats, missingItems, errorItems) {
+    const entries = [];
+    const log = (e) => entries.push(e);
     for (const { field, getMap } of STYLE_FIELDS) {
       if (!(field in node))
         continue;
@@ -165,17 +171,21 @@
       if (localId) {
         try {
           node[field] = localId;
-          result.stylesRelinked++;
-          push(result, { status: "ok", category: "style", name: style.name });
+          stats.relinked++;
+          log({ status: "ok", category: "style", name: style.name });
         } catch (e) {
-          const msg = `Style "${style.name}": ${e instanceof Error ? e.message : e}`;
-          result.errors.push(msg);
-          push(result, { status: "error", category: "style", name: style.name });
+          const m = `Style "${style.name}": ${e instanceof Error ? e.message : e}`;
+          if (!errorItems.includes(m))
+            errorItems.push(m);
+          stats.errors++;
+          log({ status: "error", category: "style", name: style.name });
         }
       } else {
-        if (!result.missing.includes(style.name))
-          result.missing.push(style.name);
-        push(result, { status: "missing", category: "style", name: style.name });
+        if (!missingItems.includes(style.name)) {
+          missingItems.push(style.name);
+          stats.missing++;
+          log({ status: "missing", category: "style", name: style.name });
+        }
       }
     }
     if ("boundVariables" in node) {
@@ -195,17 +205,21 @@
           if (localVar) {
             try {
               node.setBoundVariable(f, localVar);
-              result.variablesRelinked++;
-              push(result, { status: "ok", category: "variable", name: key });
+              stats.relinked++;
+              log({ status: "ok", category: "variable", name: key });
             } catch (e) {
-              const msg = `Variable "${key}": ${e instanceof Error ? e.message : e}`;
-              result.errors.push(msg);
-              push(result, { status: "error", category: "variable", name: key });
+              const m = `Var "${key}": ${e instanceof Error ? e.message : e}`;
+              if (!errorItems.includes(m))
+                errorItems.push(m);
+              stats.errors++;
+              log({ status: "error", category: "variable", name: key });
             }
           } else {
-            if (!result.missing.includes(key))
-              result.missing.push(key);
-            push(result, { status: "missing", category: "variable", name: key });
+            if (!missingItems.includes(key)) {
+              missingItems.push(key);
+              stats.missing++;
+              log({ status: "missing", category: "variable", name: key });
+            }
           }
         }
       }
@@ -236,17 +250,22 @@
           if (localVar) {
             try {
               p = figma.variables.setBoundVariableForPaint(p, pf, localVar);
-              result.variablesRelinked++;
+              stats.relinked++;
               dirty = true;
-              push(result, { status: "ok", category: "variable", name: key });
+              log({ status: "ok", category: "variable", name: key });
             } catch (e) {
-              result.errors.push(`Variable "${key}": ${e instanceof Error ? e.message : e}`);
-              push(result, { status: "error", category: "variable", name: key });
+              const m = `Var "${key}": ${e instanceof Error ? e.message : e}`;
+              if (!errorItems.includes(m))
+                errorItems.push(m);
+              stats.errors++;
+              log({ status: "error", category: "variable", name: key });
             }
           } else {
-            if (!result.missing.includes(key))
-              result.missing.push(key);
-            push(result, { status: "missing", category: "variable", name: key });
+            if (!missingItems.includes(key)) {
+              missingItems.push(key);
+              stats.missing++;
+              log({ status: "missing", category: "variable", name: key });
+            }
           }
         }
         return p;
@@ -260,75 +279,147 @@
       if (main) {
         const setName = getSetName(main, inst);
         if (setName) {
-          const variantProps = getVariantProps(inst);
-          const local = findLocalVariant(setName, variantProps, maps.compCache);
-          const display = Object.keys(variantProps).length > 0 ? `${setName} / ${Object.entries(variantProps).map(([k, v]) => `${k}=${v}`).join(", ")}` : setName;
+          const vp = getVariantProps(inst);
+          const display = Object.keys(vp).length > 0 ? `${setName} / ${Object.entries(vp).map(([k, v]) => `${k}=${v}`).join(", ")}` : setName;
+          const local = findLocalVariant(setName, vp, maps.compCache);
           if (local && local.key !== main.key) {
             try {
               inst.swapComponent(local);
-              result.componentsSwapped++;
-              push(result, { status: "ok", category: "component", name: display });
+              stats.relinked++;
+              log({ status: "ok", category: "component", name: display });
             } catch (e) {
-              result.errors.push(`Component "${display}": ${e instanceof Error ? e.message : e}`);
-              push(result, { status: "error", category: "component", name: display });
+              const m = `Comp "${display}": ${e instanceof Error ? e.message : e}`;
+              if (!errorItems.includes(m))
+                errorItems.push(m);
+              stats.errors++;
+              log({ status: "error", category: "component", name: display });
             }
           } else if (!local) {
-            if (!result.missing.includes(display))
-              result.missing.push(display);
-            push(result, { status: "missing", category: "component", name: display });
+            if (!missingItems.includes(display)) {
+              missingItems.push(display);
+              stats.missing++;
+              log({ status: "missing", category: "component", name: display });
+            }
           }
         }
       }
     }
-    if ("children" in node) {
-      for (const child of node.children)
-        relinkNode(child, maps, result);
+    return entries;
+  }
+  function relinkSelectionStreaming(onProgress, isStopped) {
+    return __async(this, null, function* () {
+      const sel = figma.currentPage.selection;
+      if (sel.length === 0)
+        throw new Error("Select a frame or component first.");
+      const maps = buildMaps();
+      const stats = { relinked: 0, missing: 0, errors: 0, processed: 0 };
+      const missingItems = [];
+      const errorItems = [];
+      const stack = [...sel].reverse();
+      let batchEntries = [];
+      let batchCount = 0;
+      while (stack.length > 0 && !isStopped()) {
+        const node = stack.pop();
+        stats.processed++;
+        const entries = processNode(node, maps, stats, missingItems, errorItems);
+        batchEntries.push(...entries);
+        if ("children" in node) {
+          const children = node.children;
+          for (let i = children.length - 1; i >= 0; i--)
+            stack.push(children[i]);
+        }
+        batchCount++;
+        if (batchCount >= BATCH) {
+          batchCount = 0;
+          if (batchEntries.length > 0) {
+            onProgress([...batchEntries], __spreadValues({}, stats));
+            batchEntries = [];
+          }
+          yield tick();
+        }
+      }
+      if (batchEntries.length > 0)
+        onProgress([...batchEntries], __spreadValues({}, stats));
+      return { stats, missingItems, errorItems, stopped: isStopped() };
+    });
+  }
+  var tick, STYLE_FIELDS, SCALAR_VAR_FIELDS, PAINT_VAR_FIELDS, BATCH;
+  var init_relinker = __esm({
+    "src/relinker.ts"() {
+      "use strict";
+      tick = () => new Promise((r) => setTimeout(r, 0));
+      STYLE_FIELDS = [
+        { field: "fillStyleId", getMap: (m) => m.paintStyles },
+        { field: "strokeStyleId", getMap: (m) => m.paintStyles },
+        { field: "effectStyleId", getMap: (m) => m.effectStyles },
+        { field: "textStyleId", getMap: (m) => m.textStyles },
+        { field: "gridStyleId", getMap: (m) => m.gridStyles }
+      ];
+      SCALAR_VAR_FIELDS = [
+        "opacity",
+        "cornerRadius",
+        "topLeftRadius",
+        "topRightRadius",
+        "bottomLeftRadius",
+        "bottomRightRadius",
+        "itemSpacing",
+        "paddingTop",
+        "paddingBottom",
+        "paddingLeft",
+        "paddingRight",
+        "strokeWeight",
+        "minWidth",
+        "maxWidth",
+        "minHeight",
+        "maxHeight",
+        "counterAxisSpacing"
+      ];
+      PAINT_VAR_FIELDS = ["color", "opacity", "visible"];
+      BATCH = 12;
     }
-  }
-  function relinkSelection() {
-    const sel = figma.currentPage.selection;
-    if (sel.length === 0)
-      throw new Error("Select a frame or component first.");
-    const maps = buildMaps();
-    const result = {
-      stylesRelinked: 0,
-      variablesRelinked: 0,
-      componentsSwapped: 0,
-      missing: [],
-      errors: [],
-      log: [],
-      nodesProcessed: 0
-    };
-    for (const node of sel)
-      relinkNode(node, maps, result);
-    return result;
-  }
+  });
 
   // src/code.ts
-  figma.showUI(__html__, { width: 360, height: 520, title: "Relinker" });
-  function send(msg) {
-    figma.ui.postMessage(msg);
-  }
-  function pushSelectionInfo() {
-    const sel = figma.currentPage.selection;
-    send(sel.length === 0 ? { type: "selection-info", hasSelection: false, name: "", nodeType: "" } : { type: "selection-info", hasSelection: true, name: sel[0].name, nodeType: sel[0].type });
-  }
-  figma.on("selectionchange", pushSelectionInfo);
-  figma.ui.onmessage = (msg) => {
-    try {
-      switch (msg.type) {
-        case "get-selection-info":
-          pushSelectionInfo();
-          break;
-        case "relink-selection":
-          send({ type: "relink-result", result: relinkSelection() });
-          break;
-        case "close":
-          figma.closePlugin();
-          break;
+  var require_code = __commonJS({
+    "src/code.ts"(exports) {
+      init_relinker();
+      figma.showUI(__html__, { width: 360, height: 520, title: "Relinker" });
+      function send(msg) {
+        figma.ui.postMessage(msg);
       }
-    } catch (err) {
-      send({ type: "error", message: err instanceof Error ? err.message : String(err) });
+      function pushSelectionInfo() {
+        const sel = figma.currentPage.selection;
+        send(sel.length === 0 ? { type: "selection-info", hasSelection: false, name: "", nodeType: "" } : { type: "selection-info", hasSelection: true, name: sel[0].name, nodeType: sel[0].type });
+      }
+      figma.on("selectionchange", pushSelectionInfo);
+      var stopFlag = false;
+      figma.ui.onmessage = (msg) => __async(exports, null, function* () {
+        try {
+          switch (msg.type) {
+            case "get-selection-info":
+              pushSelectionInfo();
+              break;
+            case "stop-relink":
+              stopFlag = true;
+              break;
+            case "relink-selection":
+              stopFlag = false;
+              send({ type: "relink-start" });
+              const result = yield relinkSelectionStreaming(
+                (entries, stats) => send({ type: "relink-progress", entries, stats }),
+                () => stopFlag
+              );
+              send({ type: "relink-done", result });
+              break;
+            case "close":
+              figma.closePlugin();
+              break;
+          }
+        } catch (err) {
+          send({ type: "error", message: err instanceof Error ? err.message : String(err) });
+        }
+      });
     }
-  };
+  });
+  require_code();
 })();

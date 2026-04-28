@@ -9,113 +9,90 @@
   --text:#e0e0e0;--muted:#737373;
   --accent:#18a0fb;
   --ok:#1bc47d;    --ok-dim:rgba(27,196,125,.1);
-  --miss:#f5a623;  --miss-dim:rgba(245,166,35,.1);
+  --miss:#f5a623;  --miss-dim:rgba(245,166,35,.09);
   --err:#f24822;   --err-dim:rgba(242,72,34,.09);
   --r:6px;--font:'Inter',-apple-system,sans-serif;
 }
 body{background:var(--bg);color:var(--text);font-family:var(--font);
   font-size:12px;line-height:1.5;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 
-/* ── header ── */
-.header{padding:11px 14px 9px;border-bottom:1px solid var(--border);flex-shrink:0;
-  display:flex;align-items:center;gap:8px}
+/* header */
+.header{padding:10px 14px 9px;border-bottom:1px solid var(--border);
+  flex-shrink:0;display:flex;align-items:center;gap:8px}
 .header h1{font-size:13px;font-weight:700;flex:1}
 
-/* ── selection strip ── */
+/* selection strip */
 .sel{padding:7px 14px;background:var(--surface);border-bottom:1px solid var(--border);
   flex-shrink:0;display:flex;align-items:center;gap:8px;min-height:36px}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--border);flex-shrink:0}
 .dot.on{background:var(--accent)}
 .sel-name{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sel-type{font-size:10px;color:var(--muted)}
+.sel-sub {font-size:10px;color:var(--muted)}
 
-/* ── body ── */
-.body{flex:1;overflow-y:auto;display:flex;flex-direction:column}
-.body::-webkit-scrollbar{width:4px}
-.body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+/* body */
+.body{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
 
-/* ── idle / empty state ── */
+/* idle */
 .idle{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:10px;padding:24px 20px;text-align:center;color:var(--muted)}
-.idle .ico{font-size:28px;opacity:.6}
-.idle .title{font-size:13px;font-weight:600;color:var(--text)}
-.idle .desc{font-size:11px;line-height:1.65;max-width:210px}
+.idle .ico{font-size:28px;opacity:.55}
+.idle .title{font-size:13px;font-weight:700;color:var(--text)}
+.idle .desc{font-size:11px;line-height:1.7;max-width:220px}
 
-/* ── summary bar (inside body, sticky top when log is shown) ── */
-.summary{
-  display:flex;align-items:stretch;gap:1px;
-  border-bottom:1px solid var(--border);
-  background:var(--border);
-  flex-shrink:0;
-}
-.stat{flex:1;background:var(--surface);padding:8px 6px;text-align:center}
-.stat .val{font-size:18px;font-weight:700;line-height:1}
+/* stats strip */
+.stats{display:flex;gap:1px;background:var(--border);border-bottom:1px solid var(--border);flex-shrink:0}
+.stat{flex:1;background:var(--surface);padding:7px 4px;text-align:center}
+.stat .val{font-size:17px;font-weight:700;line-height:1;color:var(--muted)}
 .stat .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:2px}
 .stat.s-ok   .val{color:var(--ok)}
 .stat.s-miss .val{color:var(--miss)}
 .stat.s-err  .val{color:var(--err)}
-.stat.s-zero .val{color:var(--muted)}
 
-/* ── log ── */
-.log{flex:1;overflow-y:auto;padding:6px 0}
-.log::-webkit-scrollbar{width:4px}
-.log::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-
-.log-group{margin-bottom:0}
-.log-group-hdr{
-  display:flex;align-items:center;gap:6px;
-  padding:5px 14px 3px;
-  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-  color:var(--muted);position:sticky;top:0;background:var(--bg);z-index:1;
-  border-top:1px solid var(--border);
-}
-.log-group-hdr:first-child{border-top:none}
-.group-count{
-  margin-left:auto;font-size:10px;font-weight:700;padding:1px 7px;
-  border-radius:10px;letter-spacing:0
-}
-.gc-ok   {background:var(--ok-dim);  color:var(--ok)}
-.gc-miss {background:var(--miss-dim);color:var(--miss)}
-.gc-err  {background:var(--err-dim); color:var(--err)}
+/* log */
+.log-wrap{flex:1;overflow-y:auto;min-height:0}
+.log-wrap::-webkit-scrollbar{width:4px}
+.log-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
 .log-row{
-  display:flex;align-items:center;gap:8px;
-  padding:4px 14px;
-  font-size:11px;
+  display:flex;align-items:center;gap:7px;
+  padding:3px 14px;font-size:11px;
   border-bottom:1px solid transparent;
-  transition:background .1s;
 }
 .log-row:hover{background:var(--surface)}
-.log-row .icon{flex-shrink:0;font-size:12px;width:14px;text-align:center}
-.icon-ok   {color:var(--ok)}
-.icon-miss {color:var(--miss)}
-.icon-err  {color:var(--err)}
-.log-row .cat{
-  flex-shrink:0;font-size:9px;font-weight:700;text-transform:uppercase;
-  padding:1px 5px;border-radius:3px;letter-spacing:.04em
+.log-row.row-ok   {border-left:2px solid var(--ok)}
+.log-row.row-miss {border-left:2px solid var(--miss)}
+.log-row.row-err  {border-left:2px solid var(--err)}
+.ico-ok   {color:var(--ok);  flex-shrink:0;width:12px;text-align:center;font-size:11px}
+.ico-miss {color:var(--miss);flex-shrink:0;width:12px;text-align:center;font-size:11px}
+.ico-err  {color:var(--err); flex-shrink:0;width:12px;text-align:center;font-size:11px}
+.cat{flex-shrink:0;font-size:9px;font-weight:700;text-transform:uppercase;
+  padding:1px 5px;border-radius:3px;letter-spacing:.04em}
+.cat-style    {background:rgba(24,160,251,.14);color:#18a0fb}
+.cat-variable {background:rgba(255,204,0,.14); color:#f5c400}
+.cat-component{background:rgba(242,72,34,.14); color:#f24822}
+.log-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* stopped banner */
+.stopped-row{
+  padding:5px 14px;background:var(--miss-dim);
+  border-top:1px solid rgba(245,166,35,.3);
+  font-size:11px;color:var(--miss);text-align:center;
+  flex-shrink:0;
 }
-.cat-style   {background:rgba(24,160,251,.14);color:#18a0fb}
-.cat-variable{background:rgba(255,204,0,.14);color:#f5c400}
-.cat-component{background:rgba(242,72,34,.14);color:#f24822}
-.log-row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 
-/* ── show more ── */
-.show-more-row{padding:4px 14px}
-.show-more{background:none;border:none;color:var(--accent);font-size:11px;
-  cursor:pointer;padding:0;font-family:var(--font)}
-.show-more:hover{text-decoration:underline}
-
-/* ── footer ── */
+/* footer */
 .footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:8px}
 .btn{flex:1;padding:8px 12px;border-radius:var(--r);font-family:var(--font);
   font-size:12px;font-weight:600;cursor:pointer;border:none;transition:background .12s,opacity .12s}
 .btn:disabled{opacity:.35;cursor:not-allowed}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:not(:disabled):hover{background:#0d90e8}
-.btn-ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.btn-danger {background:var(--err);color:#fff}
+.btn-danger:not(:disabled):hover{background:#d93d1e}
+.btn-ghost  {background:var(--surface2);border:1px solid var(--border);color:var(--text)}
 .btn-ghost:not(:disabled):hover{background:#404040}
 
-/* ── status bar ── */
+/* status bar */
 .sbar{height:24px;padding:0 14px;display:flex;align-items:center;gap:6px;
   font-size:11px;border-top:1px solid var(--border);flex-shrink:0}
 .sbar.hidden{display:none}
@@ -124,237 +101,223 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);
 .sbar.ok   .sdot{background:var(--ok)}
 .sbar.warn .sdot{background:var(--miss)}
 .sbar.err  .sdot{background:var(--err)}
-.sbar.busy{color:var(--accent)}
-.sbar.ok  {color:var(--ok)}
-.sbar.warn{color:var(--miss)}
-.sbar.err {color:var(--err)}
+.sbar.busy{color:var(--accent)}.sbar.ok{color:var(--ok)}.sbar.warn{color:var(--miss)}.sbar.err{color:var(--err)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>Relinker</h1>
-</div>
+<div class="header"><h1>Relinker</h1></div>
 
 <div class="sel">
   <div id="dot" class="dot"></div>
   <div style="overflow:hidden;flex:1">
     <div id="sel-name" class="sel-name" style="color:var(--muted)">Nothing selected</div>
-    <div id="sel-type" class="sel-type">Select a frame or component</div>
+    <div id="sel-sub"  class="sel-sub">Select a frame or component</div>
   </div>
 </div>
 
 <div class="body" id="body">
-  <!-- idle / log rendered here -->
+  <!-- idle / log shown here -->
 </div>
 
 <div class="footer">
-  <button id="btn-relink" class="btn btn-primary" disabled>Relink</button>
+  <button id="btn-stop"   class="btn btn-danger"  style="display:none">Stop</button>
+  <button id="btn-relink" class="btn btn-primary"  disabled>Relink</button>
 </div>
 
 <div id="sbar" class="sbar hidden">
-  <div class="sdot"></div>
-  <span id="sbar-text"></span>
+  <div class="sdot"></div><span id="sbar-txt"></span>
 </div>
 
 <script>
-// ─── state ───────────────────────────────────
-let hasSel = false;
+// ── state ─────────────────────────────────────
+let hasSel    = false;
+let running   = false;
 
-// ─── DOM ─────────────────────────────────────
-const dot       = document.getElementById('dot');
-const selName   = document.getElementById('sel-name');
-const selType   = document.getElementById('sel-type');
-const body      = document.getElementById('body');
-const btnRelink = document.getElementById('btn-relink');
-const sbar      = document.getElementById('sbar');
-const sbarText  = document.getElementById('sbar-text');
+// ── dedup sets (reset each run) ───────────────
+let seenOk   = new Set();
+let seenMiss = new Set();
+let seenErr  = new Set();
 
-// ─── status bar ──────────────────────────────
-function status(type, text){ sbar.className='sbar '+type; sbarText.textContent=text; }
+// ── stats (live) ──────────────────────────────
+let liveStats = { relinked:0, missing:0, errors:0, processed:0 };
+
+// ── DOM ───────────────────────────────────────
+const dot      = document.getElementById('dot');
+const selName  = document.getElementById('sel-name');
+const selSub   = document.getElementById('sel-sub');
+const body     = document.getElementById('body');
+const btnStop  = document.getElementById('btn-stop');
+const btnRelink= document.getElementById('btn-relink');
+const sbar     = document.getElementById('sbar');
+const sbarTxt  = document.getElementById('sbar-txt');
+
+// ── status bar ────────────────────────────────
+function setStatus(type, txt){ sbar.className='sbar '+type; sbarTxt.textContent=txt; }
 function clearStatus(){ sbar.className='sbar hidden'; }
 
-// ─── selection ───────────────────────────────
+// ── selection ─────────────────────────────────
 function updateSel(info){
   hasSel = info.hasSelection;
   dot.className = 'dot'+(hasSel?' on':'');
   if(hasSel){
-    selName.textContent = info.name;
-    selName.style.color = '';
-    selType.textContent = info.nodeType;
+    selName.textContent = info.name; selName.style.color='';
+    selSub.textContent  = info.nodeType;
   } else {
-    selName.textContent = 'Nothing selected';
-    selName.style.color = 'var(--muted)';
-    selType.textContent = 'Select a frame or component';
+    selName.textContent='Nothing selected'; selName.style.color='var(--muted)';
+    selSub.textContent ='Select a frame or component';
     showIdle();
   }
+  if(!running) btnRelink.disabled = !hasSel;
+}
+
+// ── idle ──────────────────────────────────────
+function showIdle(){
+  body.innerHTML=`<div class="idle">
+    <div class="ico">⇄</div>
+    <div class="title">Relinker</div>
+    <div class="desc">Select a frame pasted from a donor library and click <strong>Relink</strong>.<br><br>
+    The plugin walks every node in the tree, including inside nested components, and relinks styles, variables and component instances to local equivalents in real time.</div>
+  </div>`;
+}
+
+// ── build log shell (stats + empty log) ───────
+function buildLogShell(){
+  body.innerHTML=`
+    <div class="stats" id="stats">
+      <div class="stat" id="s-ok">  <div class="val" id="v-ok">0</div>  <div class="lbl">Relinked</div></div>
+      <div class="stat" id="s-miss"><div class="val" id="v-miss">0</div><div class="lbl">Missing</div></div>
+      <div class="stat" id="s-err"> <div class="val" id="v-err">0</div> <div class="lbl">Errors</div></div>
+    </div>
+    <div class="log-wrap" id="log-wrap"></div>`;
+}
+
+// ── update live stats ─────────────────────────
+function updateStats(stats){
+  liveStats = stats;
+  const vOk   = document.getElementById('v-ok');
+  const vMiss = document.getElementById('v-miss');
+  const vErr  = document.getElementById('v-err');
+  const sOk   = document.getElementById('s-ok');
+  const sMiss = document.getElementById('s-miss');
+  const sErr  = document.getElementById('s-err');
+  if(!vOk) return;
+  vOk.textContent   = stats.relinked;
+  vMiss.textContent = stats.missing;
+  vErr.textContent  = stats.errors;
+  sOk.className   = 'stat'+(stats.relinked>0?' s-ok':'');
+  sMiss.className = 'stat'+(stats.missing>0?' s-miss':'');
+  sErr.className  = 'stat'+(stats.errors>0?' s-err':'');
+  setStatus('busy',`Processing… ${stats.processed} nodes`);
+}
+
+// ── append log entries ────────────────────────
+const ICON = { ok:'✓', missing:'✗', error:'!' };
+const ICON_CLS = { ok:'ico-ok', missing:'ico-miss', error:'ico-err' };
+const ROW_CLS  = { ok:'row-ok', missing:'row-miss', error:'row-err' };
+const CAT_LBL  = { style:'STYLE', variable:'VAR', component:'COMP' };
+
+function appendEntries(entries){
+  const wrap = document.getElementById('log-wrap');
+  if(!wrap) return;
+  const frag = document.createDocumentFragment();
+  for(const e of entries){
+    // dedup per-status — show each unique name once per category
+    const key = `${e.status}|${e.category}|${e.name}`;
+    const seen = e.status==='ok' ? seenOk : e.status==='missing' ? seenMiss : seenErr;
+    if(seen.has(key)) continue;
+    seen.add(key);
+
+    const row = document.createElement('div');
+    row.className = `log-row ${ROW_CLS[e.status]}`;
+    row.innerHTML = `<span class="${ICON_CLS[e.status]}">${ICON[e.status]}</span>
+      <span class="cat cat-${e.category}">${CAT_LBL[e.category]}</span>
+      <span class="log-name" title="${esc(e.name)}">${esc(e.name)}</span>`;
+    frag.appendChild(row);
+  }
+  wrap.appendChild(frag);
+  // auto-scroll to bottom
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+// ── add stopped banner ────────────────────────
+function addStoppedBanner(){
+  const wrap = document.getElementById('log-wrap');
+  if(!wrap) return;
+  const banner = document.createElement('div');
+  banner.className = 'stopped-row';
+  banner.textContent = '⏹ Stopped by user — partial results above';
+  wrap.appendChild(banner);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+// ── escape ────────────────────────────────────
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── set running state ─────────────────────────
+function setRunning(on){
+  running = on;
+  btnStop.style.display  = on ? '' : 'none';
+  btnRelink.style.display= on ? 'none' : '';
   btnRelink.disabled = !hasSel;
 }
 
-// ─── idle state ───────────────────────────────
-function showIdle(){
-  body.innerHTML = `
-    <div class="idle">
-      <div class="ico">⇄</div>
-      <div class="title">Relinker</div>
-      <div class="desc">
-        Select a frame pasted from a donor library,
-        then click <strong>Relink</strong>.<br><br>
-        The plugin walks every node in the tree —
-        including inside nested components — and relinks
-        all styles, variables and component instances
-        to local equivalents.
-      </div>
-    </div>`;
-}
-
-// ─── escape ──────────────────────────────────
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-// ─── render log ──────────────────────────────
-const MAX_PER_GROUP = 8;
-
-function catLabel(cat){ return cat === 'style' ? 'STYLE' : cat === 'variable' ? 'VAR' : 'COMP'; }
-function catCls(cat)  { return 'cat-'+cat; }
-
-function renderLog(res){
-  const ok   = res.log.filter(e => e.status === 'ok');
-  const miss = res.log.filter(e => e.status === 'missing');
-  const err  = res.log.filter(e => e.status === 'error');
-
-  const total  = res.stylesRelinked + res.variablesRelinked + res.componentsSwapped;
-  const errCnt = res.errors.length;
-  const missCnt= res.missing.length;
-
-  // deduplicate missing/error log entries by name
-  const uniqMiss = dedup(miss);
-  const uniqErr  = dedup(err);
-
-  let html = '';
-
-  // ── summary bar ──
-  html += `<div class="summary">
-    <div class="stat ${total>0?'s-ok':'s-zero'}">
-      <div class="val">${total}</div><div class="lbl">Relinked</div>
-    </div>
-    <div class="stat ${missCnt>0?'s-miss':'s-zero'}">
-      <div class="val">${missCnt}</div><div class="lbl">Missing</div>
-    </div>
-    <div class="stat ${errCnt>0?'s-err':'s-zero'}">
-      <div class="val">${errCnt}</div><div class="lbl">Errors</div>
-    </div>
-  </div>`;
-
-  html += '<div class="log" id="log">';
-
-  // ── relinked ──
-  if(ok.length){
-    html += group('✓ Relinked', ok.length, 'gc-ok', ok, MAX_PER_GROUP);
-  }
-
-  // ── missing ──
-  if(uniqMiss.length){
-    html += group('✗ Missing locally — skipped', uniqMiss.length, 'gc-miss', uniqMiss, MAX_PER_GROUP);
-  }
-
-  // ── errors ──
-  if(uniqErr.length){
-    html += group('! Errors — skipped', uniqErr.length, 'gc-err', uniqErr, MAX_PER_GROUP);
-  }
-
-  if(!ok.length && !uniqMiss.length && !uniqErr.length){
-    html += `<div style="padding:24px 14px;text-align:center;color:var(--muted);font-size:11px">
-      Nothing to relink — no external dependencies found.
-    </div>`;
-  }
-
-  html += '</div>'; // .log
-
-  body.innerHTML = html;
-
-  // wire show-more
-  body.querySelectorAll('.show-more').forEach(btn => {
-    btn.addEventListener('click', ()=>{
-      btn.closest('.log-group').querySelectorAll('[data-hidden]').forEach(r=>{
-        r.style.display=''; r.removeAttribute('data-hidden');
-      });
-      btn.closest('.show-more-row').remove();
-    });
-  });
-}
-
-function dedup(entries){
-  const seen = new Set();
-  return entries.filter(e=>{ if(seen.has(e.name)) return false; seen.add(e.name); return true; });
-}
-
-function group(title, count, pillCls, entries, max){
-  let h = `<div class="log-group">
-    <div class="log-group-hdr">
-      ${esc(title)}
-      <span class="group-count ${pillCls}">${count}</span>
-    </div>`;
-
-  const iconMap = { ok:'<span class="icon icon-ok">✓</span>', missing:'<span class="icon icon-miss">✗</span>', error:'<span class="icon icon-err">!</span>' };
-
-  entries.forEach((e,i)=>{
-    const hidden = i >= max;
-    h += `<div class="log-row"${hidden?' style="display:none" data-hidden':''}>
-      ${iconMap[e.status]||''}
-      <span class="cat ${catCls(e.category)}">${catLabel(e.category)}</span>
-      <span class="name" title="${esc(e.name)}">${esc(e.name)}</span>
-    </div>`;
-  });
-
-  if(entries.length > max){
-    h += `<div class="show-more-row">
-      <button class="show-more">Show ${entries.length-max} more…</button>
-    </div>`;
-  }
-
-  h += '</div>';
-  return h;
-}
-
-// ─── buttons ─────────────────────────────────
-btnRelink.addEventListener('click', ()=>{
-  status('busy','Relinking — walking full tree…');
-  btnRelink.disabled = true;
+// ── buttons ───────────────────────────────────
+btnRelink.addEventListener('click',()=>{
+  seenOk = new Set(); seenMiss = new Set(); seenErr = new Set();
+  buildLogShell();
+  setRunning(true);
   parent.postMessage({pluginMessage:{type:'relink-selection'}},'*');
 });
 
-// ─── messages ────────────────────────────────
+btnStop.addEventListener('click',()=>{
+  btnStop.disabled = true;
+  btnStop.textContent = 'Stopping…';
+  parent.postMessage({pluginMessage:{type:'stop-relink'}},'*');
+});
+
+// ── plugin messages ───────────────────────────
 window.onmessage = e => {
   const msg = e.data.pluginMessage;
   if(!msg) return;
   switch(msg.type){
+
     case 'selection-info':
       updateSel(msg);
-      clearStatus();
+      if(!running) clearStatus();
       break;
 
-    case 'relink-result': {
+    case 'relink-start':
+      // shell already built on button click; nothing extra needed
+      break;
+
+    case 'relink-progress':
+      appendEntries(msg.entries);
+      updateStats(msg.stats);
+      break;
+
+    case 'relink-done': {
       const r = msg.result;
-      renderLog(r);
-      btnRelink.disabled = !hasSel;
-      const total = r.stylesRelinked + r.variablesRelinked + r.componentsSwapped;
-      const ec = r.errors.length, mc = r.missing.length;
-      if(ec>0)       status('warn', `${total} relinked · ${ec} error${ec>1?'s':''} skipped · ${mc} missing`);
-      else if(mc>0)  status('ok',   `${total} relinked · ${mc} missing locally`);
-      else if(total) status('ok',   `${total} ${total===1?'dependency':'dependencies'} relinked`);
-      else           clearStatus();
+      updateStats(r.stats);
+      if(r.stopped) addStoppedBanner();
+      setRunning(false);
+      const { relinked, missing, errors } = r.stats;
+      if(errors>0)        setStatus('warn',`${relinked} relinked · ${errors} error${errors>1?'s':''} · ${missing} missing`);
+      else if(missing>0)  setStatus('ok',  `${relinked} relinked · ${missing} missing locally`);
+      else if(relinked>0) setStatus('ok',  `${relinked} ${relinked===1?'dependency':'dependencies'} relinked ✓`);
+      else                setStatus('ok',  'Nothing to relink — all already local');
       break;
     }
 
     case 'error':
-      status('err', msg.message);
-      btnRelink.disabled = !hasSel;
+      setRunning(false);
+      setStatus('err', msg.message);
       break;
   }
 };
 
-// ─── boot ────────────────────────────────────
+// ── boot ──────────────────────────────────────
 showIdle();
 parent.postMessage({pluginMessage:{type:'get-selection-info'}},'*');
 </script>

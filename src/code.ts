@@ -1,11 +1,9 @@
 import { PluginMessage, UIMessage } from './types';
-import { relinkSelection } from './relinker';
+import { relinkSelectionStreaming } from './relinker';
 
 figma.showUI(__html__, { width: 360, height: 520, title: 'Relinker' });
 
-function send(msg: UIMessage): void {
-  figma.ui.postMessage(msg);
-}
+function send(msg: UIMessage): void { figma.ui.postMessage(msg); }
 
 function pushSelectionInfo(): void {
   const sel = figma.currentPage.selection;
@@ -16,15 +14,27 @@ function pushSelectionInfo(): void {
 
 figma.on('selectionchange', pushSelectionInfo);
 
-figma.ui.onmessage = (msg: PluginMessage) => {
+let stopFlag = false;
+
+figma.ui.onmessage = async (msg: PluginMessage) => {
   try {
     switch (msg.type) {
       case 'get-selection-info':
         pushSelectionInfo();
         break;
 
+      case 'stop-relink':
+        stopFlag = true;
+        break;
+
       case 'relink-selection':
-        send({ type: 'relink-result', result: relinkSelection() });
+        stopFlag = false;
+        send({ type: 'relink-start' });
+        const result = await relinkSelectionStreaming(
+          (entries, stats) => send({ type: 'relink-progress', entries, stats }),
+          () => stopFlag,
+        );
+        send({ type: 'relink-done', result });
         break;
 
       case 'close':

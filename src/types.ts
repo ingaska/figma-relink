@@ -4,22 +4,29 @@ export interface LogEntry {
   name: string;
 }
 
+export interface RelinkStats {
+  relinked:  number;
+  missing:   number;
+  errors:    number;
+  processed: number;
+}
+
 export interface RelinkResult {
-  stylesRelinked:    number;
-  variablesRelinked: number;
-  componentsSwapped: number;
-  missing: string[];   // items not found locally
-  errors:  string[];   // items found but failed to apply
-  log:     LogEntry[]; // full ordered action log
-  nodesProcessed: number;
+  stats:        RelinkStats;
+  missingItems: string[];
+  errorItems:   string[];
+  stopped:      boolean;
 }
 
 export type PluginMessage =
   | { type: 'relink-selection' }
+  | { type: 'stop-relink' }
   | { type: 'get-selection-info' }
   | { type: 'close' };
 
 export type UIMessage =
   | { type: 'selection-info'; hasSelection: boolean; name: string; nodeType: string }
-  | { type: 'relink-result'; result: RelinkResult }
+  | { type: 'relink-start' }
+  | { type: 'relink-progress'; entries: LogEntry[]; stats: RelinkStats }
+  | { type: 'relink-done'; result: RelinkResult }
   | { type: 'error'; message: string };
