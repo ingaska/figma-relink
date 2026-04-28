@@ -260,8 +260,12 @@
         continue;
       const localId = getMap(maps).get(style.name);
       if (localId) {
-        node[field] = localId;
-        result.stylesRelinked++;
+        try {
+          node[field] = localId;
+          result.stylesRelinked++;
+        } catch (e) {
+          result.errors.push(`Style "${style.name}": ${e instanceof Error ? e.message : e}`);
+        }
       } else if (!result.stylesMissing.includes(style.name)) {
         result.stylesMissing.push(style.name);
       }
@@ -285,6 +289,7 @@
               node.setBoundVariable(f, localVar);
               result.variablesRelinked++;
             } catch (e) {
+              result.errors.push(`Variable "${key}": ${e instanceof Error ? e.message : e}`);
             }
           } else if (!result.variablesMissing.includes(key)) {
             result.variablesMissing.push(key);
@@ -340,8 +345,13 @@
           const variantProps = getVariantProps(inst);
           const local = findLocalVariant(setName, variantProps, maps.compCache);
           if (local && local.key !== main.key) {
-            inst.swapComponent(local);
-            result.componentsSwapped++;
+            try {
+              inst.swapComponent(local);
+              result.componentsSwapped++;
+            } catch (e) {
+              const display = compDisplayName(setName, variantProps, main.name);
+              result.errors.push(`Component "${display}": ${e instanceof Error ? e.message : e}`);
+            }
           } else if (!local) {
             const display = compDisplayName(setName, variantProps, main.name);
             if (!result.componentsMissing.includes(display))
@@ -368,6 +378,7 @@
       variablesMissing: [],
       componentsSwapped: 0,
       componentsMissing: [],
+      errors: [],
       nodesProcessed: 0
     };
     for (const node of sel)

@@ -28,6 +28,7 @@ export interface RelinkResult {
   variablesMissing: string[];
   componentsSwapped: number;
   componentsMissing: string[];
+  errors: string[];        // non-fatal errors — relink continues past these
   nodesProcessed: number;
 }
 

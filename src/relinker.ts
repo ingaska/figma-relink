@@ -295,8 +295,12 @@ function relinkNode(node: SceneNode, maps: Maps, result: RelinkResult): void {
     if (!style) continue;
     const localId = getMap(maps).get(style.name);
     if (localId) {
-      (node as Record<string, unknown>)[field] = localId;
-      result.stylesRelinked++;
+      try {
+        (node as Record<string, unknown>)[field] = localId;
+        result.stylesRelinked++;
+      } catch (e) {
+        result.errors.push(`Style "${style.name}": ${e instanceof Error ? e.message : e}`);
+      }
     } else if (!result.stylesMissing.includes(style.name)) {
       result.stylesMissing.push(style.name);
     }
@@ -319,7 +323,9 @@ function relinkNode(node: SceneNode, maps: Maps, result: RelinkResult): void {
             (node as SceneNode & { setBoundVariable(f: string, v: Variable | null): void })
               .setBoundVariable(f, localVar);
             result.variablesRelinked++;
-          } catch { /* field may not support binding on this node type */ }
+          } catch (e) {
+            result.errors.push(`Variable "${key}": ${e instanceof Error ? e.message : e}`);
+          }
         } else if (!result.variablesMissing.includes(key)) {
           result.variablesMissing.push(key);
         }
@@ -370,8 +376,13 @@ function relinkNode(node: SceneNode, maps: Maps, result: RelinkResult): void {
         const variantProps = getVariantProps(inst);
         const local = findLocalVariant(setName, variantProps, maps.compCache);
         if (local && local.key !== main.key) {
-          inst.swapComponent(local);
-          result.componentsSwapped++;
+          try {
+            inst.swapComponent(local);
+            result.componentsSwapped++;
+          } catch (e) {
+            const display = compDisplayName(setName, variantProps, main.name);
+            result.errors.push(`Component "${display}": ${e instanceof Error ? e.message : e}`);
+          }
         } else if (!local) {
           const display = compDisplayName(setName, variantProps, main.name);
           if (!result.componentsMissing.includes(display)) result.componentsMissing.push(display);
@@ -396,6 +407,7 @@ export function relinkSelection(): RelinkResult {
     stylesRelinked: 0,   stylesMissing: [],
     variablesRelinked: 0, variablesMissing: [],
     componentsSwapped: 0, componentsMissing: [],
+    errors: [],
     nodesProcessed: 0,
   };
   for (const node of sel) relinkNode(node as SceneNode, maps, result);
